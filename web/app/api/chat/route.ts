@@ -1,8 +1,8 @@
 const GATEWAY = process.env.HERMES_GATEWAY_URL ?? "http://127.0.0.1:8642/v1/chat/completions";
 const KEY = process.env.HERMES_API_KEY;
 
-// Vercel Hobby max is 60s; Pro allows up to 300. Keep at 60 so deploy succeeds.
-export const maxDuration = 60;
+// Fluid compute: Hobby/Pro default max is 300s. Pro can go higher (800+).
+export const maxDuration = 300;
 
 export async function POST(request: Request): Promise<Response> {
   if (!KEY) {
