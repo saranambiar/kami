@@ -1,3 +1,5 @@
+import { traceGatewayCall } from "@/lib/tracing";
+
 const GATEWAY = process.env.HERMES_GATEWAY_URL ?? "http://127.0.0.1:8642/v1/chat/completions";
 const KEY = process.env.HERMES_API_KEY;
 
@@ -10,6 +12,20 @@ export async function POST(request: Request): Promise<Response> {
   const body = await request.text();
   const sessionId = request.headers.get("x-hermes-session-id");
 
+  let parsed: { model?: string; messages?: { content?: string }[] } = {};
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    /* forward as-is */
+  }
+
+  const trace = traceGatewayCall({
+    name: "kami-chat",
+    sessionId,
+    model: parsed.model ?? "unknown",
+    input: parsed.messages?.at(-1)?.content?.slice(0, 4000) ?? null,
+  });
+
   try {
     const upstream = await fetch(GATEWAY, {
       method: "POST",
@@ -21,7 +37,8 @@ export async function POST(request: Request): Promise<Response> {
       body,
     });
 
-    return new Response(upstream.body, {
+    const wrapped = trace.wrap(upstream);
+    return new Response(wrapped.body, {
       status: upstream.status,
       headers: {
         "Content-Type": upstream.headers.get("content-type") ?? "application/json",
@@ -30,6 +47,7 @@ export async function POST(request: Request): Promise<Response> {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "gateway unreachable";
+    trace.fail(message);
     return Response.json({ error: `Hermes gateway error: ${message}` }, { status: 502 });
   }
 }
