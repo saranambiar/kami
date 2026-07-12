@@ -8,13 +8,16 @@
     "start": "next start"
   },
   "dependencies": {
+    "@langfuse/otel": "^5.9.1",
+    "@langfuse/tracing": "^5.9.1",
+    "@opentelemetry/sdk-trace-node": "^2.9.0",
     "@supabase/supabase-js": "^2.110.2",
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
-    "@types/node": "^20",
+    "@types/node": "^26.1.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "typescript": "^5"

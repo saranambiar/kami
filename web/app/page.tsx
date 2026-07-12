@@ -44,19 +44,37 @@ export default function Home() {
     persistedCount.current = 0;
     sessionRef.current = newSessionId();
 
-    dbIdRef.current = await createSession({
-      hermesSessionId: sessionRef.current,
-      domain: params.domain,
-      goals: params.goals,
-      stage: params.stage,
-    });
+    setEvents([{ phase: "research", message: `linkup: live web scrape of ${params.domain}…`, at: "" }]);
+
+    // Research pre-step (Linkup) runs in parallel with session creation.
+    const [dbId, research] = await Promise.all([
+      createSession({
+        hermesSessionId: sessionRef.current,
+        domain: params.domain,
+        goals: params.goals,
+        stage: params.stage,
+      }),
+      fetch("/api/research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: params.domain }),
+      })
+        .then((r) => r.json())
+        .then((j) => (j.facts as string) ?? "")
+        .catch(() => ""),
+    ]);
+    dbIdRef.current = dbId;
 
     let full = "";
     try {
-      full = await streamChat(onboardingPrompt(params), sessionRef.current, (delta) => {
-        full += delta;
-        syncEvents(full);
-      });
+      full = await streamChat(
+        onboardingPrompt({ ...params, researchFacts: research }),
+        sessionRef.current,
+        (delta) => {
+          full += delta;
+          syncEvents(full);
+        },
+      );
       const parsed = parseDossier(full);
       setDossier(parsed);
       if (parsed) {
@@ -74,6 +92,28 @@ export default function Home() {
     }
   }
 
+  interface Deliverable {
+    surface: "x" | "email";
+    text: string;
+    to?: string;
+    subject?: string;
+  }
+
+  function parseDeliverable(text: string): Deliverable | null {
+    const matches = [...text.matchAll(/```json\s*([\s\S]*?)```/g)];
+    const last = matches.at(-1)?.[1];
+    if (!last) return null;
+    try {
+      const parsed = JSON.parse(last);
+      if (parsed && (parsed.surface === "x" || parsed.surface === "email") && parsed.text) {
+        return parsed as Deliverable;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   async function approve(title: string, playbook: string) {
     setExecuting(true);
     setOppStatus((s) => ({ ...s, [title]: "approved" }));
@@ -85,13 +125,71 @@ export default function Home() {
         full += delta;
         syncEvents(full);
       });
-      setOppStatus((s) => ({ ...s, [title]: "executed" }));
-      persist(dbIdRef.current, "opportunity_status", {
-        title,
-        status: "executed",
-        receipt: { mode: "dry_run", output: full.slice(0, 4000) },
-      });
       persist(dbIdRef.current, "message", { role: "assistant", content: full });
+
+      const deliverable = parseDeliverable(full);
+      let receipt: Record<string, unknown> = { mode: "dry_run", output: full.slice(0, 4000) };
+
+      if (deliverable) {
+        const target =
+          deliverable.surface === "x"
+            ? "post publicly on X from the connected account"
+            : `send a real email to ${deliverable.to ?? "the prospect"}`;
+        const confirmed = window.confirm(
+          `Reviewer approved. This will ${target}:\n\n${deliverable.text.slice(0, 500)}\n\nProceed with the real send?`,
+        );
+
+        if (confirmed) {
+          const endpoint = deliverable.surface === "x" ? "/api/x/post" : "/api/email/send";
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: deliverable.text,
+              to: deliverable.to,
+              subject: deliverable.subject,
+              sessionDbId: dbIdRef.current,
+            }),
+          });
+          const json = await res.json();
+          if (res.ok && json.sent) {
+            receipt = { mode: "real", ...json.receipt };
+            const proof = json.receipt.url ?? json.receipt.message_id;
+            setEvents((e) => [
+              ...e,
+              { phase: "execute", message: `✓ REAL SEND complete — ${proof}`, at: "" },
+            ]);
+          } else {
+            setEvents((e) => [
+              ...e,
+              { phase: "execute", message: `⚠ send failed: ${json.error ?? res.status} — logged as draft`, at: "" },
+            ]);
+            receipt = { mode: "failed_send", error: json.error ?? res.status };
+          }
+        } else {
+          setEvents((e) => [
+            ...e,
+            { phase: "execute", message: "send cancelled by user — kept as draft", at: "" },
+          ]);
+          receipt = { mode: "cancelled", output: deliverable.text };
+        }
+      } else {
+        // no parseable deliverable → log the drafting output for the CRM as before
+        void fetch("/api/crm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            surface: playbook === "content_post" ? "x" : "email",
+            draft: full.slice(0, 4000),
+            status: "drafted",
+            receipt: { mode: "dry_run", opportunity: title },
+            sessionDbId: dbIdRef.current,
+          }),
+        }).catch(() => {});
+      }
+
+      setOppStatus((s) => ({ ...s, [title]: "executed" }));
+      persist(dbIdRef.current, "opportunity_status", { title, status: "executed", receipt });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "request failed";
       setEvents((e) => [...e, { phase: "execute", message: `⚠ ${msg}`, at: "" }]);
@@ -117,7 +215,7 @@ export default function Home() {
   }
 
   return (
-    <main className="container">
+    <main className={view === "landing" ? "container" : "container-wide"}>
       {view === "landing" ? (
         <Landing onLaunch={launch} busy={running} />
       ) : (

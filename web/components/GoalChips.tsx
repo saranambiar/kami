@@ -40,7 +40,7 @@ function Chip({
       }}
     >
       <span style={{ fontWeight: 700, color: selected ? "var(--hanko)" : "var(--outline)" }}>
-        {selected ? "✗" : "·"}
+        {selected ? "✓" : "·"}
       </span>
       {label}
     </button>

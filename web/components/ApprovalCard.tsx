@@ -33,7 +33,7 @@ export default function ApprovalCard({
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", alignItems: "flex-end" }}>
           {status === "executed" ? (
             <span className="mono" style={{ color: "var(--moss)", fontWeight: 700 }}>
-              ✗ EXECUTED (dry run)
+              ✓ EXECUTED (dry run)
             </span>
           ) : status === "dismissed" ? (
             <span className="mono" style={{ color: "var(--outline)" }}>
