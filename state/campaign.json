@@ -1,0 +1,17 @@
+{
+  "briefs": [],
+  "work_orders": [],
+  "results": [],
+  "prospects": [],
+  "drafts": [],
+  "verdicts": [],
+  "receipts": [],
+  "do_not_contact": [
+    "banned.com"
+  ],
+  "business_rules": {
+    "max_sends_per_day": 35,
+    "max_sequence_steps": 4
+  },
+  "runs": []
+}
