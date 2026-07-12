@@ -1,11 +1,11 @@
 import { getTweetMetrics } from "@/lib/x";
-import { resolveXCreds } from "@/lib/xCreds";
+import { resolveXAccess } from "@/lib/xCreds";
 import { supabaseServer } from "@/lib/supabase";
 
-// Refresh engagement on sent X posts using the connected account's creds.
+// Refresh engagement on sent X posts using the connected account's token.
 export async function POST(): Promise<Response> {
-  const resolved = await resolveXCreds();
-  if (!resolved) return Response.json({ error: "No X account connected" }, { status: 503 });
+  const access = await resolveXAccess();
+  if (!access) return Response.json({ error: "No X account connected" }, { status: 503 });
   const sb = supabaseServer();
   if (!sb) return Response.json({ error: "supabase not configured" }, { status: 503 });
 
@@ -24,7 +24,7 @@ export async function POST(): Promise<Response> {
     .filter((id): id is string => Boolean(id));
 
   try {
-    const tweets = await getTweetMetrics(ids, resolved.creds);
+    const tweets = await getTweetMetrics(ids, access.token);
     let updated = 0;
     for (const tweet of tweets) {
       const row = sent.find((r) => (r.receipt as { post_id?: string })?.post_id === tweet.id);

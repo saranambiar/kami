@@ -1,7 +1,6 @@
-import { verifyCreds, type XCreds } from "@/lib/x";
 import { supabaseServer } from "@/lib/supabase";
 
-// GET: list connected accounts (keys never returned).
+// GET: list connected accounts (tokens never returned).
 export async function GET(): Promise<Response> {
   const sb = supabaseServer();
   if (!sb) return Response.json({ accounts: [] });
@@ -12,45 +11,17 @@ export async function GET(): Promise<Response> {
   return Response.json({ accounts: data ?? [] });
 }
 
-// POST: connect an account. For X with keys: verify live against the X API,
-// then store. Without keys: register as pending (demo state).
+// POST: register a pending connection for platforms without a real flow yet
+// (X connects via /api/auth/x/login OAuth instead).
 export async function POST(request: Request): Promise<Response> {
   const sb = supabaseServer();
-  const body = await request.json();
-  const { platform, handle, keys } = body as {
-    platform: string;
-    handle?: string;
-    keys?: Partial<XCreds>;
-  };
+  const { platform, handle } = await request.json();
   if (!platform) return Response.json({ error: "platform required" }, { status: 400 });
-
-  // BYOK path: verify the user's own X keys before storing.
-  if (platform === "x" && keys) {
-    const { consumerKey, consumerSecret, accessToken, accessSecret } = keys;
-    if (!consumerKey || !consumerSecret || !accessToken || !accessSecret) {
-      return Response.json({ error: "all four X keys are required" }, { status: 400 });
-    }
-    try {
-      const user = await verifyCreds(keys as XCreds);
-      if (sb) {
-        // one connected X account at a time — replace previous
-        await sb.from("connected_accounts").delete().eq("platform", "x");
-        await sb.from("connected_accounts").insert({
-          platform: "x",
-          handle: `@${user.username}`,
-          status: "connected",
-          oauth: keys,
-        });
-      }
-      return Response.json({ connected: true, handle: `@${user.username}` });
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "verification failed";
-      return Response.json({ error: message }, { status: 401 });
-    }
+  if (platform === "x") {
+    return Response.json({ error: "connect X via /api/auth/x/login" }, { status: 400 });
   }
-
-  // Demo/pending path (other platforms, or X without keys)
   if (!sb) return Response.json({ persisted: false, status: "pending" });
+
   const { data, error } = await sb
     .from("connected_accounts")
     .insert({ platform, handle: handle ?? null, status: "pending" })

@@ -28,7 +28,6 @@ export default function Landing({ onLaunch, busy }: LandingProps) {
   const [domain, setDomain] = useState("");
   const [goals, setGoals] = useState<string[]>([]);
   const [stage, setStage] = useState<string | null>(null);
-  const [xConnected, setXConnected] = useState(false);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -101,7 +100,7 @@ export default function Landing({ onLaunch, busy }: LandingProps) {
         />
 
         <div style={{ marginTop: "var(--stack-sm)" }}>
-          <ConnectX connected={xConnected} onConnected={() => setXConnected(true)} />
+          <ConnectX />
         </div>
       </section>
 
