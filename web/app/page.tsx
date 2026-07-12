@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Landing, { type LaunchParams } from "@/components/Landing";
 import Dashboard from "@/components/Dashboard";
 import { parseActivity, type ActivityEvent } from "@/components/ActivityFeed";
@@ -23,6 +23,36 @@ export default function Home() {
   const sessionRef = useRef(newSessionId());
   const dbIdRef = useRef<string | null>(null);
   const persistedCount = useRef(0);
+
+  // Resume the last session from Supabase on mount — no token burn on navigation.
+  useEffect(() => {
+    const saved = localStorage.getItem("kami_session");
+    if (!saved) return;
+    const { dbId, hermesId } = JSON.parse(saved) as { dbId: string; hermesId: string };
+    if (!dbId) return;
+    fetch(`/api/sessions/${dbId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data?.session) return;
+        sessionRef.current = hermesId;
+        dbIdRef.current = dbId;
+        setDomain(data.session.domain);
+        setEvents(
+          (data.activity ?? []).map((a: { phase: string; message: string }) => ({
+            phase: a.phase ?? "agent",
+            message: a.message,
+            at: "",
+          })),
+        );
+        persistedCount.current = (data.activity ?? []).length;
+        if (data.brand?.raw_dossier) setDossier(data.brand.raw_dossier as DossierData);
+        const statuses: Record<string, OpportunityStatus> = {};
+        for (const o of data.opportunities ?? []) statuses[o.title] = o.status;
+        setOppStatus(statuses);
+        setView("dashboard");
+      })
+      .catch(() => {});
+  }, []);
 
   function syncEvents(fullText: string) {
     const parsed = parseActivity(fullText);
@@ -64,6 +94,12 @@ export default function Home() {
         .catch(() => ""),
     ]);
     dbIdRef.current = dbId;
+    if (dbId) {
+      localStorage.setItem(
+        "kami_session",
+        JSON.stringify({ dbId, hermesId: sessionRef.current }),
+      );
+    }
 
     let full = "";
     try {
@@ -99,18 +135,31 @@ export default function Home() {
     subject?: string;
   }
 
-  function parseDeliverable(text: string): Deliverable | null {
+  function parseDeliverable(
+    text: string,
+  ): { deliverable: Deliverable | null; needsInput: string[] | null } {
     const matches = [...text.matchAll(/```json\s*([\s\S]*?)```/g)];
     const last = matches.at(-1)?.[1];
-    if (!last) return null;
+    if (!last) return { deliverable: null, needsInput: null };
     try {
       const parsed = JSON.parse(last);
-      if (parsed && (parsed.surface === "x" || parsed.surface === "email") && parsed.text) {
-        return parsed as Deliverable;
+      if (parsed?.status === "needs_input") {
+        return { deliverable: null, needsInput: parsed.missing ?? [] };
       }
-      return null;
+      // sendable = complete: X needs text; email additionally needs to + subject
+      if (
+        parsed?.text &&
+        (parsed.surface === "x" || (parsed.surface === "email" && parsed.to && parsed.subject))
+      ) {
+        return { deliverable: parsed as Deliverable, needsInput: null };
+      }
+      // deliverable present but incomplete → treat as blocked, not a failed send
+      if (parsed?.surface) {
+        return { deliverable: null, needsInput: ["complete recipient details"] };
+      }
+      return { deliverable: null, needsInput: null };
     } catch {
-      return null;
+      return { deliverable: null, needsInput: null };
     }
   }
 
@@ -127,10 +176,21 @@ export default function Home() {
       });
       persist(dbIdRef.current, "message", { role: "assistant", content: full });
 
-      const deliverable = parseDeliverable(full);
+      const { deliverable, needsInput } = parseDeliverable(full);
       let receipt: Record<string, unknown> = { mode: "dry_run", output: full.slice(0, 4000) };
 
-      if (deliverable) {
+      if (needsInput) {
+        // agents correctly blocked the send — surface what's missing, keep as draft
+        setEvents((e) => [
+          ...e,
+          {
+            phase: "result",
+            message: `⏸ blocked by the agency's own rules — needs: ${needsInput.join("; ") || "more input"}. Kept as draft.`,
+            at: "",
+          },
+        ]);
+        receipt = { mode: "needs_input", missing: needsInput, output: full.slice(0, 4000) };
+      } else if (deliverable) {
         const target =
           deliverable.surface === "x"
             ? "post publicly on X from the connected account"
@@ -205,6 +265,17 @@ export default function Home() {
     persist(dbIdRef.current, "opportunity_status", { title, status: "dismissed" });
   }
 
+  function newCampaign() {
+    localStorage.removeItem("kami_session");
+    setView("landing");
+    setDomain("");
+    setEvents([]);
+    setDossier(null);
+    setOppStatus({});
+    dbIdRef.current = null;
+    persistedCount.current = 0;
+  }
+
   async function connectChannel(platform: string) {
     setConnectedChannels((c) => (c.includes(platform) ? c : [...c, platform]));
     void fetch("/api/accounts", {
@@ -231,6 +302,7 @@ export default function Home() {
           onConnect={connectChannel}
           onApprove={approve}
           onDismiss={dismiss}
+          onNewCampaign={newCampaign}
         />
       )}
     </main>
