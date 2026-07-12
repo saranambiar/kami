@@ -48,7 +48,7 @@ export default function CrmPage() {
   }, [filter]);
 
   return (
-    <main className="container" style={{ paddingBottom: "var(--stack-lg)" }}>
+    <main className="container-wide" style={{ paddingBottom: "var(--stack-lg)" }}>
       <div style={{ paddingTop: "var(--stack-md)" }}>
         <h2>
           Outreach CRM <span style={{ color: "var(--hanko)" }}>· every touch, tracked</span>

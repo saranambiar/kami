@@ -7,7 +7,7 @@ export default function Nav() {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        maxWidth: 880,
+        maxWidth: 1440,
         margin: "0 auto",
       }}
     >

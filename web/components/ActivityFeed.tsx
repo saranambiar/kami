@@ -28,6 +28,8 @@ const PHASE_COLOR: Record<string, string> = {
   buckets: "var(--hanko)",
   strategy: "var(--moss)",
   execute: "var(--hanko)",
+  handoff: "var(--hanko)",
+  result: "var(--moss)",
   agent: "var(--outline)",
 };
 
@@ -72,6 +74,10 @@ export default function ActivityFeed({ events, running }: ActivityFeedProps) {
               alignItems: "baseline",
               borderLeft: `3px solid ${PHASE_COLOR[e.phase] ?? "var(--outline)"}`,
               paddingLeft: "0.75rem",
+              // handoffs are the org-structure evidence — make them pop
+              ...(e.phase === "handoff" || e.phase === "result"
+                ? { background: "var(--kraft-light)", padding: "0.4rem 0.75rem", border: "1px solid var(--crease)", borderLeft: `3px solid ${PHASE_COLOR[e.phase]}` }
+                : {}),
             }}
           >
             <span className="mono" style={{ color: PHASE_COLOR[e.phase] ?? "var(--outline)", minWidth: 92 }}>

@@ -43,7 +43,7 @@ export default function BoardPage() {
   }, []);
 
   return (
-    <main className="container" style={{ paddingBottom: "var(--stack-lg)" }}>
+    <main className="container-wide" style={{ paddingBottom: "var(--stack-lg)" }}>
       <div style={{ paddingTop: "var(--stack-md)" }}>
         <h2>
           Task Board <span style={{ color: "var(--hanko)" }}>· agency work in flight</span>

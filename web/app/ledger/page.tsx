@@ -45,7 +45,7 @@ export default function LedgerPage() {
   const maxTokens = Math.max(1, ...runs.map((r) => r.input_tokens + r.output_tokens));
 
   return (
-    <main className="container" style={{ paddingBottom: "var(--stack-lg)" }}>
+    <main className="container-wide" style={{ paddingBottom: "var(--stack-lg)" }}>
       <div style={{ paddingTop: "var(--stack-md)" }}>
         <h2>
           Run Ledger <span style={{ color: "var(--hanko)" }}>· every agent run, accounted</span>

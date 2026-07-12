@@ -129,7 +129,7 @@ export default function Home() {
   }
 
   return (
-    <main className="container">
+    <main className={view === "landing" ? "container" : "container-wide"}>
       {view === "landing" ? (
         <Landing onLaunch={launch} busy={running} />
       ) : (

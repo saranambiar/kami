@@ -53,7 +53,7 @@ export default function ConnectX({ connected, onConnected }: ConnectXProps) {
             cursor: connected ? "default" : "pointer",
           }}
         >
-          {connected ? "✗ X connected" : "Connect X"}
+          {connected ? "✓ X connected" : "Connect X"}
         </button>
         <span className="mono" style={{ color: "var(--outline)" }}>
           Reddit · soon

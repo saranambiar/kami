@@ -29,7 +29,7 @@ export default function ChannelRail({ connected, onConnect }: ChannelRailProps) 
               </p>
               {isConnected ? (
                 <span className="mono" style={{ color: "var(--moss)", fontWeight: 700 }}>
-                  ✗ connected
+                  ✓ connected
                 </span>
               ) : (
                 <button

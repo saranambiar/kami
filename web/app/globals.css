@@ -83,6 +83,13 @@ h3 {
   padding: 0 var(--margin-page);
 }
 
+/* Workspace pages (dashboard/board/ledger/crm) use the full width */
+.container-wide {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 var(--margin-page);
+}
+
 /* Crease divider: a physical paper fold */
 .crease {
   border: none;
@@ -167,9 +174,10 @@ h3 {
 /* Dashboard: left rail / center / right rail */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 220px 1fr 300px;
+  grid-template-columns: 240px minmax(0, 1fr) 340px;
   gap: var(--stack-md);
   margin-top: var(--stack-md);
+  align-items: start;
 }
 @media (max-width: 980px) {
   .dashboard-grid {

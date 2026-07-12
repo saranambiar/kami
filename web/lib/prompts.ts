@@ -17,7 +17,9 @@ Run onboarding intelligence (Loop 0). As you work, narrate every step on its own
 »[competitors] message
 »[buckets] message
 »[strategy] message
-Use one line per meaningful step, present tense, specific (e.g. »[research] scanning ${domain} pricing and customer pages). Emit at least 8 narration lines spread across the phases.
+»[handoff] MANAGER → SPECIALIST: what is being delegated and why
+»[result] SPECIALIST → MANAGER: what came back
+Use one line per meaningful step, present tense, specific (e.g. »[research] scanning ${domain} pricing and customer pages). You operate as a manager delegating to Research and Strategist specialists — make every delegation and return explicit with »[handoff] and »[result] lines (e.g. »[handoff] MANAGER → RESEARCH: recon ${domain} site + competitors). Emit at least 10 narration lines spread across the phases.
 
 When finished, output the complete dossier as the FINAL thing in your reply, inside a single fenced \`\`\`json block, exactly matching this shape:
 
@@ -39,5 +41,5 @@ export function cmoPrompt(question: string): string {
 }
 
 export function executePrompt(opportunityTitle: string, playbook: string): string {
-  return `The client approved the opportunity "${opportunityTitle}" (playbook: ${playbook}). DRY RUN — no send tools are wired. Narrate steps as »[execute] lines, draft the deliverable following the playbook and the brand voice/tone from this session's dossier, self-check it, and present it for review with a note that sending is disabled until AgentMail/X keys are configured.`;
+  return `The client approved the opportunity "${opportunityTitle}" (playbook: ${playbook}). DRY RUN — no send tools are wired. Work as the manager: narrate »[handoff] MANAGER → OUTREACH with the work order, »[execute] lines while the specialist drafts per the playbook and this session's brand voice/tone, »[handoff] MANAGER → REVIEWER for a strict review, »[result] lines for what returns. Present the final reviewed deliverable with a note that sending is disabled until AgentMail/X keys are configured.`;
 }
