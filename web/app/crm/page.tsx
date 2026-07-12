@@ -35,8 +35,9 @@ export default function CrmPage() {
   const [suppressed, setSuppressed] = useState<Suppressed[]>([]);
   const [filter, setFilter] = useState("all");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
+  function load() {
     const qs = filter === "all" ? "" : `?status=${filter}`;
     fetch(`/api/crm${qs}`)
       .then((r) => r.json())
@@ -45,14 +46,49 @@ export default function CrmPage() {
         setSuppressed(json.suppressed ?? []);
       })
       .catch(() => {});
-  }, [filter]);
+  }
+
+  useEffect(load, [filter]);
+
+  async function refreshEngagement() {
+    setRefreshing(true);
+    try {
+      await fetch("/api/x/monitor", { method: "POST" });
+      load();
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   return (
     <main className="container-wide" style={{ paddingBottom: "var(--stack-lg)" }}>
-      <div style={{ paddingTop: "var(--stack-md)" }}>
+      <div
+        style={{
+          paddingTop: "var(--stack-md)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          flexWrap: "wrap",
+          gap: "0.5rem",
+        }}
+      >
         <h2>
           Outreach CRM <span style={{ color: "var(--hanko)" }}>· every touch, tracked</span>
         </h2>
+        <button
+          type="button"
+          className="mono"
+          onClick={refreshEngagement}
+          disabled={refreshing}
+          style={{
+            border: "1px solid var(--ink)",
+            background: "transparent",
+            padding: "0.35rem 0.8rem",
+            cursor: refreshing ? "wait" : "pointer",
+          }}
+        >
+          {refreshing ? "checking X…" : "↻ refresh engagement"}
+        </button>
       </div>
       <hr className="crease" />
 
