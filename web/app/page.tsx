@@ -99,18 +99,31 @@ export default function Home() {
     subject?: string;
   }
 
-  function parseDeliverable(text: string): Deliverable | null {
+  function parseDeliverable(
+    text: string,
+  ): { deliverable: Deliverable | null; needsInput: string[] | null } {
     const matches = [...text.matchAll(/```json\s*([\s\S]*?)```/g)];
     const last = matches.at(-1)?.[1];
-    if (!last) return null;
+    if (!last) return { deliverable: null, needsInput: null };
     try {
       const parsed = JSON.parse(last);
-      if (parsed && (parsed.surface === "x" || parsed.surface === "email") && parsed.text) {
-        return parsed as Deliverable;
+      if (parsed?.status === "needs_input") {
+        return { deliverable: null, needsInput: parsed.missing ?? [] };
       }
-      return null;
+      // sendable = complete: X needs text; email additionally needs to + subject
+      if (
+        parsed?.text &&
+        (parsed.surface === "x" || (parsed.surface === "email" && parsed.to && parsed.subject))
+      ) {
+        return { deliverable: parsed as Deliverable, needsInput: null };
+      }
+      // deliverable present but incomplete → treat as blocked, not a failed send
+      if (parsed?.surface) {
+        return { deliverable: null, needsInput: ["complete recipient details"] };
+      }
+      return { deliverable: null, needsInput: null };
     } catch {
-      return null;
+      return { deliverable: null, needsInput: null };
     }
   }
 
@@ -127,10 +140,21 @@ export default function Home() {
       });
       persist(dbIdRef.current, "message", { role: "assistant", content: full });
 
-      const deliverable = parseDeliverable(full);
+      const { deliverable, needsInput } = parseDeliverable(full);
       let receipt: Record<string, unknown> = { mode: "dry_run", output: full.slice(0, 4000) };
 
-      if (deliverable) {
+      if (needsInput) {
+        // agents correctly blocked the send — surface what's missing, keep as draft
+        setEvents((e) => [
+          ...e,
+          {
+            phase: "result",
+            message: `⏸ blocked by the agency's own rules — needs: ${needsInput.join("; ") || "more input"}. Kept as draft.`,
+            at: "",
+          },
+        ]);
+        receipt = { mode: "needs_input", missing: needsInput, output: full.slice(0, 4000) };
+      } else if (deliverable) {
         const target =
           deliverable.surface === "x"
             ? "post publicly on X from the connected account"

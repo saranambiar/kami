@@ -51,8 +51,13 @@ After the reviewer approves, output the final deliverable as the LAST thing in y
 {
   "surface": "x" | "email",
   "text": "the post text (X: <= 270 chars, plain text, NO links) or the full email body",
-  "to": "recipient email (email surface only, omit for x)",
-  "subject": "email subject (email surface only, omit for x)"
+  "to": "recipient email (email surface only — REQUIRED for email)",
+  "subject": "email subject (email surface only — REQUIRED for email)"
 }
-surface should be "x" for content/awareness plays and "email" for cold outreach plays. No text after the json block. The client will confirm before it is actually sent.`;
+surface should be "x" for content/awareness plays and "email" for cold outreach plays. No text after the json block. The client will confirm before it is actually sent.
+
+If the specialist or reviewer BLOCKS the deliverable (missing verified recipient, no real signal, hard-rule violation), do NOT emit the deliverable json. Instead end with:
+\`\`\`json
+{ "status": "needs_input", "missing": ["what is needed, e.g. verified prospect email", "..."] }
+\`\`\``;
 }
