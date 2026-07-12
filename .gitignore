@@ -3,3 +3,5 @@ references/
 .env.*
 !.env.example
 .claude/settings.local.json
+node_modules/
+video/out/
