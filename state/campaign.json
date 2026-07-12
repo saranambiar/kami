@@ -1,8 +1,196 @@
 {
-  "briefs": [],
-  "work_orders": [],
+  "briefs": [
+    {
+      "campaign_id": "camp_001",
+      "company": {
+        "name": "Kami",
+        "url": "kami.example",
+        "one_liner": "AI GTM agency that runs outreach end to end"
+      },
+      "icp": {
+        "titles": [
+          "Head of Growth"
+        ],
+        "industries": [
+          "SaaS"
+        ],
+        "size": "10-50",
+        "geo": "US"
+      },
+      "goal": "book_meetings",
+      "targets": [
+        "seed-stage SaaS heads of growth"
+      ],
+      "tone": "direct, warm",
+      "constraints": {
+        "surfaces": [
+          "email"
+        ],
+        "do_not_contact": [
+          "banned.com"
+        ],
+        "deadline": "2026-07-12"
+      }
+    }
+  ],
+  "work_orders": [
+    {
+      "work_order_id": "wo_research_p_001",
+      "campaign_id": "camp_001",
+      "goal": "book_meetings",
+      "assigned_to": "research",
+      "playbook": "prospect_mode_b",
+      "inputs": {
+        "campaign_id": "camp_001",
+        "company": {
+          "name": "Kami",
+          "url": "kami.example",
+          "one_liner": "AI GTM agency that runs outreach end to end"
+        },
+        "icp": {
+          "titles": [
+            "Head of Growth"
+          ],
+          "industries": [
+            "SaaS"
+          ],
+          "size": "10-50",
+          "geo": "US"
+        },
+        "targets": [
+          "seed-stage SaaS heads of growth"
+        ],
+        "tone": "direct, warm",
+        "constraints": {
+          "surfaces": [
+            "email"
+          ],
+          "do_not_contact": [
+            "banned.com"
+          ],
+          "deadline": "2026-07-12"
+        },
+        "prospect": {
+          "prospect_id": "p_001",
+          "campaign_id": "camp_001",
+          "name": "Test Target",
+          "title": "Head of Growth",
+          "company": "Acme SaaS",
+          "email": "nameerror91@gmail.com",
+          "email_verification": "valid",
+          "status": "researched",
+          "signals": [
+            {
+              "type": "hiring",
+              "detail": "posted 3 growth roles",
+              "date": "2026-06-20",
+              "source_url": "https://example.com/jobs"
+            }
+          ],
+          "sequence_step": 1
+        },
+        "business_rules": {
+          "max_sends_per_day": 35,
+          "max_sequence_steps": 4
+        }
+      },
+      "acceptance_criteria": [
+        "Prospect has valid or safe_to_send email verification",
+        "At least one dated signal within 90 days with source_url",
+        "Prospect and domain are not on do_not_contact"
+      ],
+      "depends_on": [],
+      "budget": {
+        "max_tokens": 1200,
+        "max_tool_calls": 4
+      }
+    },
+    {
+      "work_order_id": "wo_outreach_p_001_step1",
+      "campaign_id": "camp_001",
+      "goal": "book_meetings",
+      "assigned_to": "outreach",
+      "playbook": "signal_cold_email",
+      "inputs": {
+        "campaign_id": "camp_001",
+        "company": {
+          "name": "Kami",
+          "url": "kami.example",
+          "one_liner": "AI GTM agency that runs outreach end to end"
+        },
+        "targets": [
+          "seed-stage SaaS heads of growth"
+        ],
+        "tone": "direct, warm",
+        "constraints": {
+          "surfaces": [
+            "email"
+          ],
+          "do_not_contact": [
+            "banned.com"
+          ],
+          "deadline": "2026-07-12"
+        },
+        "prospect": {
+          "prospect_id": "p_001",
+          "campaign_id": "camp_001",
+          "name": "Test Target",
+          "title": "Head of Growth",
+          "company": "Acme SaaS",
+          "email": "nameerror91@gmail.com",
+          "email_verification": "valid",
+          "status": "researched",
+          "signals": [
+            {
+              "type": "hiring",
+              "detail": "posted 3 growth roles",
+              "date": "2026-06-20",
+              "source_url": "https://example.com/jobs"
+            }
+          ],
+          "sequence_step": 1
+        },
+        "business_rules": {
+          "max_sends_per_day": 35,
+          "max_sequence_steps": 4
+        }
+      },
+      "acceptance_criteria": [
+        "Draft returns subject, body, cta, signal_ref, sequence_step, self_check",
+        "Email is plain text, 3-5 sentences, under 150 words",
+        "Exactly one CTA and signal references a real dated source_url"
+      ],
+      "depends_on": [
+        "wo_research_p_001"
+      ],
+      "budget": {
+        "max_tokens": 1800,
+        "max_tool_calls": 2
+      }
+    }
+  ],
   "results": [],
-  "prospects": [],
+  "prospects": [
+    {
+      "prospect_id": "p_001",
+      "campaign_id": "camp_001",
+      "name": "Test Target",
+      "title": "Head of Growth",
+      "company": "Acme SaaS",
+      "email": "nameerror91@gmail.com",
+      "email_verification": "valid",
+      "status": "researched",
+      "signals": [
+        {
+          "type": "hiring",
+          "detail": "posted 3 growth roles",
+          "date": "2026-06-20",
+          "source_url": "https://example.com/jobs"
+        }
+      ],
+      "sequence_step": 1
+    }
+  ],
   "drafts": [],
   "verdicts": [],
   "receipts": [],

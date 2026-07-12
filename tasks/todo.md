@@ -1,20 +1,18 @@
-# Setup / research session todos (not product architecture)
+# Sprint: outreach engine vertical slice (branch `dev`)
 
 ## Done
-- [x] Read `AGENTS.md` + `references/research-context.md`
-- [x] Follow Hermes docs + buildathon handbook + okara + GTM research links
-- [x] Confirm Hermes CLI install + local harness path
-- [x] Create `tasks/`, `lessons/`, `memory/`, `.env.example`
-- [x] OpenAI BYOK + `gpt-5.4` + API server smoke test + delegation depth ≥ 2
-- [x] Write teammate setup guide: `references/hermes-setup-guide.md`
+- [x] Pull PLAN.md + DESIGN.md; local Hermes gateway smoke-tested (:8642, OpenAI)
+- [x] Typed handoff contracts (`contracts/contracts.ts`) incl. agency-workflow fields (sequence_step, followup_at, reply/suppression statuses)
+- [x] Runtime skills: `signal_cold_email` (with follow-up cadence), `planning`, `review_rubric`, `business_rules` → synced to `~/.hermes/skills/gtm/`
+- [x] Agent prompts: manager / research / outreach / reviewer (`agents/`)
+- [x] Campaign state CLI (`state/state.py`) — JSON now, Convex-shaped; suppression self-check passing
 
-## Deferred (after planning / before demo)
-- [ ] Teammate runs same local setup via setup guide
-- [ ] Decide email surface (AgentMail vs Gmail vs Resend) + credentials
-- [ ] Decide X posting credentials if content specialist is in scope
-- [ ] Provision always-on VPS + domain + TLS (Caddy)
-- [ ] Vercel UI → Hermes API wiring
-- [ ] Claim buildathon partner perks (OpenAI org ID, LinkUp `HERMES`, etc.)
+## In progress
+- [ ] Dry-run on local Hermes: Manager orchestrator → delegate_task → Outreach draft → Reviewer bounce → approve → stub Receipt
 
-## Unblocked
-- Product architecture planning can start (local Hermes harness ready)
+## Blocked on provisioning (ping user)
+- [ ] **AgentMail key** → real send (agentmail.to, free tier)
+- [ ] Exa key (optional) → real prospect research in Research agent
+
+## Next sprints (per PLAN.md)
+- [ ] Convex swap-in for state/campaign.json; Strategist + Loop 0 dossier; LiteLLM+Langfuse; frontend per DESIGN.md; X content; evals; infra/domain
