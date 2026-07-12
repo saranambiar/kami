@@ -1,4 +1,4 @@
-import { getTweetMetrics } from "@/lib/x";
+import { getReplies, getTweetMetrics } from "@/lib/x";
 import { resolveXAccess } from "@/lib/xCreds";
 import { supabaseServer } from "@/lib/supabase";
 
@@ -30,10 +30,19 @@ export async function POST(): Promise<Response> {
       const row = sent.find((r) => (r.receipt as { post_id?: string })?.post_id === tweet.id);
       if (!row) continue;
       const metrics = tweet.public_metrics ?? {};
+      // pull actual reply content only when replies exist (search costs per call)
+      let replies: unknown[] | undefined;
+      if (metrics.reply_count > 0) {
+        replies = await getReplies(tweet.id, access.token).catch(() => undefined);
+      }
       await sb
         .from("outreach_log")
         .update({
-          receipt: { ...(row.receipt as object), metrics },
+          receipt: {
+            ...(row.receipt as object),
+            metrics,
+            ...(replies?.length ? { replies } : {}),
+          },
           ...(metrics.reply_count > 0 ? { status: "replied" } : {}),
         })
         .eq("id", row.id);
