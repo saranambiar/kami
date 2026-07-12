@@ -21,7 +21,7 @@ export async function createSession(params: {
 
 export function persist(
   sessionDbId: string | null,
-  type: "dossier" | "dossier_update" | "activity" | "message" | "status" | "opportunity_status",
+  type: "dossier" | "activity" | "message" | "status" | "opportunity_status",
   payload: Record<string, unknown>,
 ): void {
   if (!sessionDbId) return;

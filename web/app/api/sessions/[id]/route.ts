@@ -1,5 +1,4 @@
 import { supabaseServer } from "@/lib/supabase";
-import { currentUserId } from "@/lib/supabaseAuth";
 import type { Dossier } from "@/lib/hermes";
 
 // GET: load full session state for resume.
@@ -20,16 +19,6 @@ export async function GET(
   ]);
 
   if (session.error) return Response.json({ error: session.error.message }, { status: 404 });
-
-  // Ownership guard: if the session is owned by a user, only that user may read it.
-  const ownerId = (session.data as { user_id?: string | null }).user_id ?? null;
-  if (ownerId) {
-    const userId = await currentUserId();
-    if (userId !== ownerId) {
-      return Response.json({ error: "forbidden" }, { status: 403 });
-    }
-  }
-
   return Response.json({
     session: session.data,
     brand: brand.data,
@@ -40,7 +29,7 @@ export async function GET(
 }
 
 interface PatchBody {
-  type: "dossier" | "dossier_update" | "activity" | "message" | "status" | "opportunity_status";
+  type: "dossier" | "activity" | "message" | "status" | "opportunity_status";
   payload: Record<string, unknown>;
 }
 
@@ -89,36 +78,6 @@ export async function PATCH(
           );
         }
         await sb.from("agent_sessions").update({ status: "done" }).eq("id", id);
-        break;
-      }
-      case "dossier_update": {
-        // Edit/save of dossier fields — update the existing brand profile in place
-        // and replace ICP buckets. Opportunities keep their approval status.
-        const d = payload as unknown as Dossier;
-        await sb
-          .from("brand_profiles")
-          .update({
-            company: d.company,
-            brand_voice: d.brand_voice,
-            positioning: d.positioning,
-            tone: d.tone ?? null,
-            competitor_analysis: d.competitor_analysis,
-            raw_dossier: d,
-          })
-          .eq("session_id", id);
-        await sb.from("icp_buckets").delete().eq("session_id", id);
-        if (d.icp_buckets?.length) {
-          await sb.from("icp_buckets").insert(
-            d.icp_buckets.map((b) => ({
-              session_id: id,
-              label: b.label,
-              where_they_live: b.where_they_live,
-              trigger_signal: b.trigger_signal,
-              est_size: b.est_size,
-              angle: b.angle,
-            })),
-          );
-        }
         break;
       }
       case "activity":
