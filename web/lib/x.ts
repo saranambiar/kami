@@ -45,3 +45,34 @@ export async function getTweetMetrics(ids: string[], accessToken: string): Promi
   if (!res.ok) throw new Error(`X API ${res.status}: ${JSON.stringify(json).slice(0, 200)}`);
   return json.data ?? [];
 }
+
+export interface TweetReply {
+  author: string;
+  text: string;
+  at: string;
+}
+
+/** Fetch reply content for a post via recent search (conversation_id). */
+export async function getReplies(postId: string, accessToken: string): Promise<TweetReply[]> {
+  const query = new URLSearchParams({
+    query: `conversation_id:${postId} is:reply`,
+    "tweet.fields": "author_id,created_at",
+    expansions: "author_id",
+    max_results: "10",
+  });
+  const res = await fetch(`https://api.x.com/2/tweets/search/recent?${query}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`X API ${res.status}: ${JSON.stringify(json).slice(0, 200)}`);
+  const users = new Map(
+    (json.includes?.users ?? []).map((u: { id: string; username: string }) => [u.id, u.username]),
+  );
+  return (json.data ?? []).map(
+    (t: { author_id: string; text: string; created_at: string }) => ({
+      author: `@${users.get(t.author_id) ?? t.author_id}`,
+      text: t.text,
+      at: t.created_at,
+    }),
+  );
+}

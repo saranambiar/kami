@@ -53,7 +53,10 @@ export default function CrmPage() {
   async function refreshEngagement() {
     setRefreshing(true);
     try {
-      await fetch("/api/x/monitor", { method: "POST" });
+      await Promise.all([
+        fetch("/api/x/monitor", { method: "POST" }),
+        fetch("/api/email/monitor", { method: "POST" }),
+      ]);
       load();
     } finally {
       setRefreshing(false);
@@ -147,6 +150,30 @@ export default function CrmPage() {
                   >
                     {r.draft}
                   </pre>
+                )}
+                {Array.isArray(r.receipt?.replies) && r.receipt.replies.length > 0 && (
+                  <div style={{ marginTop: "var(--stack-sm)" }}>
+                    <p className="label-caps" style={{ color: "var(--moss)" }}>
+                      Replies ({r.receipt.replies.length})
+                    </p>
+                    {(r.receipt.replies as { author?: string; from?: string; text?: string; preview?: string; at: string }[]).map(
+                      (reply, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            borderLeft: "3px solid var(--moss)",
+                            paddingLeft: "0.75rem",
+                            marginTop: "0.4rem",
+                          }}
+                        >
+                          <span className="mono" style={{ fontWeight: 700 }}>
+                            {reply.author ?? reply.from}
+                          </span>{" "}
+                          <span style={{ fontSize: 14 }}>{reply.text ?? reply.preview}</span>
+                        </div>
+                      ),
+                    )}
+                  </div>
                 )}
                 <p className="mono" style={{ color: "var(--ink-soft)", marginTop: "0.4rem" }}>
                   receipt: {r.receipt ? JSON.stringify(r.receipt).slice(0, 200) : "—"} · logged{" "}
