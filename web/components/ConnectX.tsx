@@ -7,23 +7,45 @@ interface ConnectXProps {
   onConnected: (handle: string) => void;
 }
 
+const FIELDS = [
+  { key: "consumerKey", label: "API KEY" },
+  { key: "consumerSecret", label: "API KEY SECRET" },
+  { key: "accessToken", label: "ACCESS TOKEN" },
+  { key: "accessSecret", label: "ACCESS TOKEN SECRET" },
+] as const;
+
 export default function ConnectX({ connected, onConnected }: ConnectXProps) {
   const [open, setOpen] = useState(false);
-  const [handle, setHandle] = useState("");
+  const [keys, setKeys] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [handle, setHandle] = useState<string | null>(null);
+
+  const allFilled = FIELDS.every((f) => keys[f.key]?.trim());
 
   async function connect() {
-    const h = handle.trim().replace(/^@/, "");
-    if (!h) return;
+    if (!allFilled) return;
     setBusy(true);
+    setError(null);
     try {
-      await fetch("/api/accounts", {
+      const res = await fetch("/api/accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ platform: "x", handle: h }),
+        body: JSON.stringify({
+          platform: "x",
+          keys: Object.fromEntries(FIELDS.map((f) => [f.key, keys[f.key].trim()])),
+        }),
       });
-      onConnected(h);
+      const json = await res.json();
+      if (!res.ok || !json.connected) {
+        setError(json.error ?? "verification failed — check the keys");
+        return;
+      }
+      setHandle(json.handle);
+      onConnected(json.handle);
       setOpen(false);
+    } catch {
+      setError("connection failed — is the server running?");
     } finally {
       setBusy(false);
     }
@@ -53,7 +75,7 @@ export default function ConnectX({ connected, onConnected }: ConnectXProps) {
             cursor: connected ? "default" : "pointer",
           }}
         >
-          {connected ? "✓ X connected" : "Connect X"}
+          {connected ? `✓ X connected${handle ? ` (${handle})` : ""}` : "Connect X"}
         </button>
         <span className="mono" style={{ color: "var(--outline)" }}>
           Reddit · soon
@@ -78,31 +100,43 @@ export default function ConnectX({ connected, onConnected }: ConnectXProps) {
         >
           <div
             className="kraft-card"
-            style={{ maxWidth: 420, background: "var(--paper)" }}
+            style={{ maxWidth: 460, width: "90%", background: "var(--paper)", maxHeight: "85vh", overflowY: "auto" }}
             onClick={(e) => e.stopPropagation()}
           >
             <h3>Connect your X account</h3>
-            <p style={{ marginTop: "var(--stack-sm)", color: "var(--ink-soft)" }}>
-              Kami will use this account to post and conduct outreach on your behalf — every
-              action reviewed and approved by you first. Full OAuth verification lands when the
-              X app credentials are configured; for now we register the handle.
+            <p style={{ marginTop: "var(--stack-sm)", color: "var(--ink-soft)", fontSize: 14 }}>
+              Kami posts and monitors outreach <em>from your account, with your keys</em> — every
+              send approved by you first. Grab all four values from{" "}
+              <span className="mono">developer.x.com</span> → your app → Keys and tokens (access
+              token must be Read and Write). Keys are verified live and stored securely; we never
+              display them again.
             </p>
             <hr className="crease" />
-            <div className="form-line">
-              <label className="mono label-caps" htmlFor="x-handle">
-                X HANDLE
-              </label>
-              <input
-                id="x-handle"
-                value={handle}
-                onChange={(e) => setHandle(e.target.value)}
-                placeholder="@yourhandle"
-                disabled={busy}
-              />
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--stack-md)" }}>
+              {FIELDS.map((f) => (
+                <div className="form-line" key={f.key}>
+                  <label className="mono label-caps" htmlFor={`x-${f.key}`}>
+                    {f.label}
+                  </label>
+                  <input
+                    id={`x-${f.key}`}
+                    type="password"
+                    autoComplete="off"
+                    value={keys[f.key] ?? ""}
+                    onChange={(e) => setKeys((k) => ({ ...k, [f.key]: e.target.value }))}
+                    disabled={busy}
+                  />
+                </div>
+              ))}
             </div>
-            <div style={{ marginTop: "var(--stack-md)", display: "flex", gap: "1rem" }}>
-              <button className="hanko-btn" onClick={connect} disabled={busy}>
-                {busy ? "…" : "Verify"}
+            {error && (
+              <p className="mono" style={{ color: "var(--hanko)", marginTop: "var(--stack-sm)" }}>
+                ⚠ {error}
+              </p>
+            )}
+            <div style={{ marginTop: "var(--stack-md)", display: "flex", gap: "1rem", alignItems: "center" }}>
+              <button className="hanko-btn" onClick={connect} disabled={busy || !allFilled}>
+                {busy ? "verifying with X…" : "Verify & Connect"}
               </button>
               <button
                 type="button"
