@@ -17,6 +17,7 @@ interface DashboardProps {
   sessionId: string;
   connectedChannels: string[];
   onConnect: (platform: string) => void;
+  onNewCampaign: () => void;
   onApprove: (title: string, playbook: string) => void;
   onDismiss: (title: string) => void;
 }
@@ -31,6 +32,7 @@ export default function Dashboard({
   sessionId,
   connectedChannels,
   onConnect,
+  onNewCampaign,
   onApprove,
   onDismiss,
 }: DashboardProps) {
@@ -40,9 +42,24 @@ export default function Dashboard({
         <h2>
           {domain} <span style={{ color: "var(--hanko)" }}>· campaign</span>
         </h2>
-        <span className="mono" style={{ color: "var(--ink-soft)" }}>
-          session {sessionId.slice(-8)}
-        </span>
+        <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+          <span className="mono" style={{ color: "var(--ink-soft)" }}>
+            session {sessionId.slice(-8)}
+          </span>
+          <button
+            type="button"
+            className="mono"
+            onClick={onNewCampaign}
+            style={{
+              border: "1px solid var(--ink)",
+              background: "transparent",
+              padding: "0.3rem 0.7rem",
+              cursor: "pointer",
+            }}
+          >
+            + new campaign
+          </button>
+        </div>
       </div>
       <hr className="crease" />
 

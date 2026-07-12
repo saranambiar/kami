@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Landing, { type LaunchParams } from "@/components/Landing";
 import Dashboard from "@/components/Dashboard";
 import { parseActivity, type ActivityEvent } from "@/components/ActivityFeed";
@@ -23,6 +23,36 @@ export default function Home() {
   const sessionRef = useRef(newSessionId());
   const dbIdRef = useRef<string | null>(null);
   const persistedCount = useRef(0);
+
+  // Resume the last session from Supabase on mount — no token burn on navigation.
+  useEffect(() => {
+    const saved = localStorage.getItem("kami_session");
+    if (!saved) return;
+    const { dbId, hermesId } = JSON.parse(saved) as { dbId: string; hermesId: string };
+    if (!dbId) return;
+    fetch(`/api/sessions/${dbId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data?.session) return;
+        sessionRef.current = hermesId;
+        dbIdRef.current = dbId;
+        setDomain(data.session.domain);
+        setEvents(
+          (data.activity ?? []).map((a: { phase: string; message: string }) => ({
+            phase: a.phase ?? "agent",
+            message: a.message,
+            at: "",
+          })),
+        );
+        persistedCount.current = (data.activity ?? []).length;
+        if (data.brand?.raw_dossier) setDossier(data.brand.raw_dossier as DossierData);
+        const statuses: Record<string, OpportunityStatus> = {};
+        for (const o of data.opportunities ?? []) statuses[o.title] = o.status;
+        setOppStatus(statuses);
+        setView("dashboard");
+      })
+      .catch(() => {});
+  }, []);
 
   function syncEvents(fullText: string) {
     const parsed = parseActivity(fullText);
@@ -64,6 +94,12 @@ export default function Home() {
         .catch(() => ""),
     ]);
     dbIdRef.current = dbId;
+    if (dbId) {
+      localStorage.setItem(
+        "kami_session",
+        JSON.stringify({ dbId, hermesId: sessionRef.current }),
+      );
+    }
 
     let full = "";
     try {
@@ -229,6 +265,17 @@ export default function Home() {
     persist(dbIdRef.current, "opportunity_status", { title, status: "dismissed" });
   }
 
+  function newCampaign() {
+    localStorage.removeItem("kami_session");
+    setView("landing");
+    setDomain("");
+    setEvents([]);
+    setDossier(null);
+    setOppStatus({});
+    dbIdRef.current = null;
+    persistedCount.current = 0;
+  }
+
   async function connectChannel(platform: string) {
     setConnectedChannels((c) => (c.includes(platform) ? c : [...c, platform]));
     void fetch("/api/accounts", {
@@ -255,6 +302,7 @@ export default function Home() {
           onConnect={connectChannel}
           onApprove={approve}
           onDismiss={dismiss}
+          onNewCampaign={newCampaign}
         />
       )}
     </main>
