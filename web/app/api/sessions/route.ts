@@ -1,4 +1,5 @@
 import { supabaseServer } from "@/lib/supabase";
+import { currentUserId } from "@/lib/supabaseAuth";
 
 // Create a session row. Returns { id } or { id: null } when Supabase is unconfigured.
 export async function POST(request: Request): Promise<Response> {
@@ -10,9 +11,11 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: "hermesSessionId and domain required" }, { status: 400 });
   }
 
+  const userId = await currentUserId();
+
   const { data, error } = await sb
     .from("agent_sessions")
-    .insert({ hermes_session_id: hermesSessionId, domain, goals: goals ?? [], stage })
+    .insert({ hermes_session_id: hermesSessionId, domain, goals: goals ?? [], stage, user_id: userId })
     .select("id")
     .single();
 

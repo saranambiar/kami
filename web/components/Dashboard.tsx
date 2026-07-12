@@ -20,6 +20,7 @@ interface DashboardProps {
   onNewCampaign: () => void;
   onApprove: (title: string, playbook: string) => void;
   onDismiss: (title: string) => void;
+  onSaveDossier: (next: Dossier) => void;
 }
 
 export default function Dashboard({
@@ -35,6 +36,7 @@ export default function Dashboard({
   onNewCampaign,
   onApprove,
   onDismiss,
+  onSaveDossier,
 }: DashboardProps) {
   return (
     <div style={{ paddingTop: "var(--stack-md)", paddingBottom: "var(--stack-lg)" }}>
@@ -96,7 +98,7 @@ export default function Dashboard({
 
         {/* RIGHT — intelligence */}
         {dossier ? (
-          <IntelPanel dossier={dossier} />
+          <IntelPanel dossier={dossier} onSave={onSaveDossier} />
         ) : (
           <aside>
             <p className="label-caps">Intelligence</p>

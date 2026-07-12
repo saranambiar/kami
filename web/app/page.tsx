@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import Landing, { type LaunchParams } from "@/components/Landing";
 import Dashboard from "@/components/Dashboard";
 import { parseActivity, type ActivityEvent } from "@/components/ActivityFeed";
 import type { OpportunityStatus } from "@/components/ApprovalCard";
 import { newSessionId, parseDossier, streamChat, type Dossier as DossierData } from "@/lib/hermes";
 import { createSession, persist } from "@/lib/persist";
+import { supabaseBrowser, signInWithGoogle } from "@/lib/supabaseBrowser";
 import { executePrompt, onboardingPrompt } from "@/lib/prompts";
 
 type View = "landing" | "dashboard";
+const PENDING_KEY = "kami_pending_domain";
 
 export default function Home() {
   const [view, setView] = useState<View>("landing");
@@ -20,21 +23,20 @@ export default function Home() {
   const [oppStatus, setOppStatus] = useState<Record<string, OpportunityStatus>>({});
   const [executing, setExecuting] = useState(false);
   const [connectedChannels, setConnectedChannels] = useState<string[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const authEnabled = supabaseBrowser() !== null;
   const sessionRef = useRef(newSessionId());
   const dbIdRef = useRef<string | null>(null);
   const persistedCount = useRef(0);
+  const bootedRef = useRef(false);
 
-  // Resume the last session from Supabase on mount — no token burn on navigation.
-  useEffect(() => {
-    const saved = localStorage.getItem("kami_session");
-    if (!saved) return;
-    const { dbId, hermesId } = JSON.parse(saved) as { dbId: string; hermesId: string };
-    if (!dbId) return;
+  function resumeSession(dbId: string, hermesId: string | null) {
     fetch(`/api/sessions/${dbId}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!data?.session) return;
-        sessionRef.current = hermesId;
+        sessionRef.current = hermesId ?? data.session.hermes_session_id;
         dbIdRef.current = dbId;
         setDomain(data.session.domain);
         setEvents(
@@ -52,6 +54,23 @@ export default function Home() {
         setView("dashboard");
       })
       .catch(() => {});
+  }
+
+  // Track the signed-in Google user.
+  useEffect(() => {
+    const sb = supabaseBrowser();
+    if (!sb) {
+      setAuthReady(true);
+      return;
+    }
+    sb.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+      setAuthReady(true);
+    });
+    const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   function syncEvents(fullText: string) {
@@ -64,7 +83,15 @@ export default function Home() {
     persistedCount.current = parsed.length;
   }
 
-  async function launch(params: LaunchParams) {
+  const launch = useCallback(async (params: LaunchParams) => {
+    // Login gate: signed-out users are sent through single-click Google login,
+    // and the domain they entered is auto-launched once they return.
+    if (authEnabled && !user) {
+      localStorage.setItem(PENDING_KEY, JSON.stringify(params));
+      await signInWithGoogle();
+      return;
+    }
+
     setView("dashboard");
     setDomain(params.domain);
     setRunning(true);
@@ -126,7 +153,32 @@ export default function Home() {
     } finally {
       setRunning(false);
     }
-  }
+  }, [authEnabled, user]);
+
+  // After auth resolves: auto-launch a pending domain, else reopen the latest campaign.
+  useEffect(() => {
+    if (!authReady || bootedRef.current) return;
+    if (authEnabled && !user) return;
+    bootedRef.current = true;
+
+    const pending = localStorage.getItem(PENDING_KEY);
+    if (pending) {
+      localStorage.removeItem(PENDING_KEY);
+      try {
+        launch(JSON.parse(pending) as LaunchParams);
+        return;
+      } catch {
+        /* fall through to resume */
+      }
+    }
+
+    fetch("/api/sessions/latest")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.id) resumeSession(data.id, data.hermesId ?? null);
+      })
+      .catch(() => {});
+  }, [authReady, authEnabled, user, launch]);
 
   interface Deliverable {
     surface: "x" | "email";
@@ -265,6 +317,11 @@ export default function Home() {
     persist(dbIdRef.current, "opportunity_status", { title, status: "dismissed" });
   }
 
+  const saveDossier = useCallback((next: DossierData) => {
+    setDossier(next);
+    persist(dbIdRef.current, "dossier_update", next as unknown as Record<string, unknown>);
+  }, []);
+
   function newCampaign() {
     localStorage.removeItem("kami_session");
     setView("landing");
@@ -288,7 +345,7 @@ export default function Home() {
   return (
     <main className={view === "landing" ? "container" : "container-wide"}>
       {view === "landing" ? (
-        <Landing onLaunch={launch} busy={running} />
+        <Landing onLaunch={launch} busy={running} authed={!!user} authEnabled={authEnabled} />
       ) : (
         <Dashboard
           domain={domain}
@@ -303,6 +360,7 @@ export default function Home() {
           onApprove={approve}
           onDismiss={dismiss}
           onNewCampaign={newCampaign}
+          onSaveDossier={saveDossier}
         />
       )}
     </main>
