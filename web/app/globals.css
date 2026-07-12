@@ -164,6 +164,19 @@ h3 {
   overflow-y: auto;
 }
 
+/* Dashboard: left rail / center / right rail */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 220px 1fr 300px;
+  gap: var(--stack-md);
+  margin-top: var(--stack-md);
+}
+@media (max-width: 980px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 640px) {
   :root {
     --margin-page: 1rem;

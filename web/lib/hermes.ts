@@ -16,6 +16,7 @@ export interface Dossier {
   company: string;
   brand_voice: string;
   positioning: string;
+  tone?: string[];
   competitor_analysis: { name: string; insight: string }[];
   icp_buckets: IcpBucket[];
   opportunities: Opportunity[];
