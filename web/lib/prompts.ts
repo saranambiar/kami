@@ -11,7 +11,14 @@ export function onboardingPrompt({ domain, goals, stage }: OnboardingContext): s
   return `You are the MANAGER of Kami, an AI GTM agency. A new client just submitted their domain: ${domain}
 ${goalLine} ${stageLine} Weight your strategy, bucket choices, and opportunities toward these goals and stage.
 
-Run onboarding intelligence (Loop 0). As you work, narrate every step on its own line using EXACTLY this format (these stream live to the client's activity feed):
+Run onboarding intelligence (Loop 0).
+
+Tools (mandatory):
+- Prefer web_search_plus and web_extract_plus (Linkup). Call web_search_plus with provider="linkup" when available.
+- Prefer web_extract_plus(provider="linkup") to fetch ${domain} and key competitor pages — do NOT use browser_navigate / browser tools (they hang on this host).
+- If only legacy web_search exists, use it; never block waiting on a browser.
+
+As you work, narrate every step on its own line using EXACTLY this format (these stream live to the client's activity feed):
 »[research] message
 »[brand] message
 »[competitors] message
