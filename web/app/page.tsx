@@ -92,6 +92,18 @@ export default function Home() {
         receipt: { mode: "dry_run", output: full.slice(0, 4000) },
       });
       persist(dbIdRef.current, "message", { role: "assistant", content: full });
+      // CRM: log the executed outreach (dry run receipt until real surfaces are wired)
+      void fetch("/api/crm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          surface: playbook === "content_post" ? "x" : "email",
+          draft: full.slice(0, 4000),
+          status: "drafted",
+          receipt: { mode: "dry_run", opportunity: title },
+          sessionDbId: dbIdRef.current,
+        }),
+      }).catch(() => {});
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "request failed";
       setEvents((e) => [...e, { phase: "execute", message: `⚠ ${msg}`, at: "" }]);

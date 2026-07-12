@@ -42,8 +42,9 @@ export default function Nav() {
         </span>
       </a>
       <div style={{ display: "flex", gap: "1.5rem" }} className="label-caps">
-        <a href="#dossier">Dossier</a>
-        <a href="#trace">Runs</a>
+        <a href="/board">Board</a>
+        <a href="/ledger">Ledger</a>
+        <a href="/crm">CRM</a>
       </div>
     </nav>
   );
