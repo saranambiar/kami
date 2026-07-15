@@ -7,6 +7,7 @@ import ChannelRail from "@/components/ChannelRail";
 import IntelPanel from "@/components/IntelPanel";
 import CmoChat from "@/components/CmoChat";
 import CampaignTabs from "@/components/CampaignTabs";
+import MarketingPanel from "@/components/MarketingPanel";
 import type { Dossier } from "@/lib/hermes";
 import type { CampaignTab, MarketingConfig } from "@/lib/marketingTypes";
 
@@ -125,11 +126,13 @@ export default function Dashboard({
       )}
 
       {tab === "marketing" && (
-        <div style={{ marginTop: "var(--stack-md)" }}>
-          <p className="mono" style={{ color: "var(--ink-soft)" }}>
-            Marketing panel loading…
-          </p>
-        </div>
+        <MarketingPanel
+          sessionId={sessionId}
+          sessionDbId={sessionDbId}
+          config={marketingConfig}
+          dossierTone={dossier?.tone}
+          onSetup={onMarketingSetup}
+        />
       )}
 
       {tab === "sales" && (
