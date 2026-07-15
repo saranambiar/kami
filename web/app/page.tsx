@@ -8,6 +8,7 @@ import type { OpportunityStatus } from "@/components/ApprovalCard";
 import { newSessionId, parseDossier, streamChat, type Dossier as DossierData } from "@/lib/hermes";
 import { createSession, persist } from "@/lib/persist";
 import { executePrompt, onboardingPrompt } from "@/lib/prompts";
+import type { MarketingConfig } from "@/lib/marketingTypes";
 
 type View = "landing" | "dashboard";
 
@@ -20,6 +21,7 @@ export default function Home() {
   const [oppStatus, setOppStatus] = useState<Record<string, OpportunityStatus>>({});
   const [executing, setExecuting] = useState(false);
   const [connectedChannels, setConnectedChannels] = useState<string[]>([]);
+  const [marketingConfig, setMarketingConfig] = useState<MarketingConfig | null>(null);
   const sessionRef = useRef(newSessionId());
   const dbIdRef = useRef<string | null>(null);
   const persistedCount = useRef(0);
@@ -298,11 +300,14 @@ export default function Home() {
           oppStatus={oppStatus}
           executing={executing}
           sessionId={sessionRef.current}
+          sessionDbId={dbIdRef.current}
           connectedChannels={connectedChannels}
+          marketingConfig={marketingConfig}
           onConnect={connectChannel}
           onApprove={approve}
           onDismiss={dismiss}
           onNewCampaign={newCampaign}
+          onMarketingSetup={setMarketingConfig}
         />
       )}
     </main>

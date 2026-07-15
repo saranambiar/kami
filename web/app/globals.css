@@ -196,3 +196,43 @@ h3 {
     font-size: 24px;
   }
 }
+
+/* Campaign tab bar */
+.campaign-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--crease);
+  margin-top: var(--stack-sm);
+}
+.campaign-tab {
+  background: none;
+  border: none;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  padding: 0.6rem 1.25rem;
+  cursor: pointer;
+  position: relative;
+}
+.campaign-tab:hover {
+  color: var(--ink);
+}
+.campaign-tab[data-active="true"] {
+  color: var(--ink);
+}
+.campaign-tab[data-active="true"]::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--hanko);
+}
+.campaign-tab:disabled {
+  color: var(--outline);
+  cursor: default;
+}
