@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { MarketingConfig, MarketingPlatform, OutreachGoal } from "@/lib/marketingTypes";
 
 interface MarketingSetupProps {
-  sessionId: string;
+  sessionDbId: string | null;
   existingTone?: string[];
   onComplete: (config: MarketingConfig) => void;
 }
@@ -22,7 +22,7 @@ const GOALS: { key: OutreachGoal; label: string }[] = [
 
 const TONES = ["professional", "casual", "witty", "direct"];
 
-export default function MarketingSetup({ sessionId, existingTone, onComplete }: MarketingSetupProps) {
+export default function MarketingSetup({ sessionDbId, existingTone, onComplete }: MarketingSetupProps) {
   const [platforms, setPlatforms] = useState<MarketingPlatform[]>([]);
   const [xBudget, setXBudget] = useState(200);
   const [xGoal, setXGoal] = useState<OutreachGoal>("drive_signups");
@@ -32,6 +32,7 @@ export default function MarketingSetup({ sessionId, existingTone, onComplete }: 
   const [igMinFollowers, setIgMinFollowers] = useState(5000);
   const [tone, setTone] = useState<string[]>(existingTone ?? []);
   const [useDossierTone, setUseDossierTone] = useState(Boolean(existingTone?.length));
+  const [saving, setSaving] = useState(false);
 
   function togglePlatform(p: MarketingPlatform) {
     setPlatforms((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
@@ -41,19 +42,40 @@ export default function MarketingSetup({ sessionId, existingTone, onComplete }: 
     setTone((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
   }
 
-  function submit() {
-    if (platforms.length === 0) return;
-    onComplete({
-      session_id: sessionId,
+  async function submit() {
+    if (platforms.length === 0 || !sessionDbId) return;
+    setSaving(true);
+    const payload = {
+      session_id: sessionDbId,
       platforms,
       x_boost_budget: platforms.includes("x") ? xBudget : undefined,
       x_outreach_goal: platforms.includes("x") ? xGoal : undefined,
       ig_offer_min: platforms.includes("instagram") ? igOfferMin : undefined,
       ig_offer_max: platforms.includes("instagram") ? igOfferMax : undefined,
-      ig_niche_keywords: platforms.includes("instagram") ? igKeywords.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
+      ig_niche_keywords: platforms.includes("instagram")
+        ? igKeywords.split(",").map((s) => s.trim()).filter(Boolean)
+        : undefined,
       ig_min_followers: platforms.includes("instagram") ? igMinFollowers : undefined,
       tone: useDossierTone ? existingTone : tone,
-    });
+    };
+
+    try {
+      const res = await fetch("/api/marketing/setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (res.ok && json.config) {
+        onComplete(json.config as MarketingConfig);
+      } else {
+        onComplete({ ...payload, session_id: sessionDbId });
+      }
+    } catch {
+      onComplete({ ...payload, session_id: sessionDbId });
+    } finally {
+      setSaving(false);
+    }
   }
 
   const hasX = platforms.includes("x");
@@ -62,6 +84,12 @@ export default function MarketingSetup({ sessionId, existingTone, onComplete }: 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto", paddingTop: "var(--stack-lg)" }}>
       <h3 style={{ marginBottom: "var(--stack-md)" }}>Set up Marketing</h3>
+
+      {!sessionDbId && (
+        <p className="mono" style={{ color: "var(--hanko)", marginBottom: "var(--stack-md)" }}>
+          Waiting for session — launch a campaign first.
+        </p>
+      )}
 
       <p className="label-caps" style={{ marginBottom: "var(--stack-sm)" }}>Select platforms</p>
       <div style={{ display: "flex", gap: "var(--stack-md)", marginBottom: "var(--stack-lg)" }}>
@@ -199,8 +227,8 @@ export default function MarketingSetup({ sessionId, existingTone, onComplete }: 
         </div>
       )}
 
-      <button className="hanko-btn" onClick={submit} disabled={platforms.length === 0}>
-        Launch Marketing
+      <button className="hanko-btn" onClick={submit} disabled={platforms.length === 0 || !sessionDbId || saving}>
+        {saving ? "Saving…" : "Launch Marketing"}
       </button>
     </div>
   );

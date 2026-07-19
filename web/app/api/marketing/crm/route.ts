@@ -24,15 +24,49 @@ export async function POST(request: Request): Promise<Response> {
   if (!sb) return Response.json({ persisted: false });
 
   const body = await request.json();
-  const { session_id, type, platform, handle, name, followers, engagement_rate, niche_match_score, relevance_reasoning, offer_amount, status } = body;
+  const {
+    id,
+    session_id,
+    type,
+    platform,
+    handle,
+    name,
+    followers,
+    engagement_rate,
+    niche_match_score,
+    relevance_reasoning,
+    offer_amount,
+    status,
+  } = body;
+
+  // Approve / status-update flow: update by id
+  if (id && status) {
+    const { data, error } = await sb
+      .from("marketing_crm")
+      .update({
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select("id")
+      .single();
+
+    if (error) return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ persisted: true, id: data.id, updated: true });
+  }
 
   if (!type || !platform || !handle) {
     return Response.json({ error: "type, platform, handle required" }, { status: 400 });
   }
 
+  if (!session_id) {
+    return Response.json({ error: "session_id required for upsert" }, { status: 400 });
+  }
+
   const { data: existing } = await sb
     .from("marketing_crm")
     .select("id")
+    .eq("session_id", session_id)
     .eq("platform", platform)
     .eq("handle", handle)
     .maybeSingle();
@@ -58,7 +92,7 @@ export async function POST(request: Request): Promise<Response> {
   const { data, error } = await sb
     .from("marketing_crm")
     .insert({
-      session_id: session_id ?? null,
+      session_id,
       type,
       platform,
       handle,
