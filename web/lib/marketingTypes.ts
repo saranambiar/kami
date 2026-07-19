@@ -12,6 +12,7 @@ export interface MarketingConfig {
   ig_niche_keywords?: string[];
   ig_min_followers?: number;
   tone?: string[];
+  autonomous_paused?: boolean;
 }
 
 export type XLeadStatus =

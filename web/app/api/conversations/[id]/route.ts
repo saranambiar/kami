@@ -6,7 +6,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!sb) return Response.json({ messages: [] });
 
   const { data: messages } = await sb
-    .from("conversation_messages")
+    .from("marketing_conversation_messages")
     .select("*")
     .eq("conversation_id", id)
     .order("sent_at", { ascending: true });
@@ -22,14 +22,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { action, content } = await request.json();
 
   if (action === "send" && content) {
-    await sb.from("conversation_messages").insert({
+    await sb.from("marketing_conversation_messages").insert({
       conversation_id: id,
       sender: "kami",
       content,
       status: "sent",
     });
     await sb
-      .from("conversations")
+      .from("marketing_conversations")
       .update({ status: "response_sent", updated_at: new Date().toISOString() })
       .eq("id", id);
     return Response.json({ sent: true });
@@ -38,7 +38,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (action === "approve" || action === "counter" || action === "decline") {
     const newStatus = action === "decline" ? "concluded" : "awaiting_reply";
     await sb
-      .from("conversations")
+      .from("marketing_conversations")
       .update({
         status: newStatus,
         escalation_reason: null,

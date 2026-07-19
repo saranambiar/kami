@@ -9,19 +9,23 @@ import ConversationsPanel from "@/components/ConversationsPanel";
 import KillSwitch from "@/components/KillSwitch";
 
 interface MarketingPanelProps {
-  sessionId: string;
   sessionDbId: string | null;
   config: MarketingConfig | null;
   dossierTone?: string[];
   onSetup: (config: MarketingConfig) => void;
 }
 
-export default function MarketingPanel({ sessionId, sessionDbId, config, dossierTone, onSetup }: MarketingPanelProps) {
+export default function MarketingPanel({ sessionDbId, config, dossierTone, onSetup }: MarketingPanelProps) {
   const [entries, setEntries] = useState<MarketingCrmEntry[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [platformFilter, setPlatformFilter] = useState<"all" | "x" | "instagram">("all");
   const [showSettings, setShowSettings] = useState(false);
-  const [paused, setPaused] = useState(false);
+  const [paused, setPaused] = useState(config?.autonomous_paused ?? false);
+  const [pauseSaving, setPauseSaving] = useState(false);
+
+  useEffect(() => {
+    setPaused(config?.autonomous_paused ?? false);
+  }, [config?.autonomous_paused]);
 
   const fetchCrm = useCallback(() => {
     if (!sessionDbId) return;
@@ -44,10 +48,31 @@ export default function MarketingPanel({ sessionId, sessionDbId, config, dossier
     fetchConversations();
   }, [fetchCrm, fetchConversations]);
 
+  async function handlePauseChange(nextPaused: boolean) {
+    if (!sessionDbId) return;
+    setPaused(nextPaused);
+    setPauseSaving(true);
+    try {
+      const res = await fetch("/api/marketing/setup", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionDbId, autonomous_paused: nextPaused }),
+      });
+      const json = await res.json();
+      if (res.ok && json.config && config) {
+        onSetup({ ...config, autonomous_paused: json.config.autonomous_paused });
+      }
+    } catch {
+      setPaused(!nextPaused);
+    } finally {
+      setPauseSaving(false);
+    }
+  }
+
   if (!config || showSettings) {
     return (
       <MarketingSetup
-        sessionId={sessionId}
+        sessionDbId={sessionDbId}
         existingTone={dossierTone}
         onComplete={(c) => {
           onSetup(c);
@@ -65,7 +90,7 @@ export default function MarketingPanel({ sessionId, sessionDbId, config, dossier
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--stack-sm)" }}>
         <p className="label-caps">Marketing Operations</p>
-        <KillSwitch paused={paused} onToggle={() => setPaused(!paused)} />
+        <KillSwitch paused={paused} onChange={handlePauseChange} disabled={pauseSaving || !sessionDbId} />
       </div>
       <hr className="crease" />
       <div className="dashboard-grid">
@@ -80,6 +105,7 @@ export default function MarketingPanel({ sessionId, sessionDbId, config, dossier
           entries={filtered}
           config={config}
           sessionDbId={sessionDbId}
+          paused={paused}
           onRefresh={fetchCrm}
         />
         <ConversationsPanel

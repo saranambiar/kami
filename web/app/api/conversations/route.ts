@@ -7,7 +7,7 @@ export async function GET(request: Request): Promise<Response> {
   const sessionId = new URL(request.url).searchParams.get("session_id");
 
   let query = sb
-    .from("conversations")
+    .from("marketing_conversations")
     .select("*, marketing_crm!inner(session_id, handle, platform)")
     .order("updated_at", { ascending: false })
     .limit(100);

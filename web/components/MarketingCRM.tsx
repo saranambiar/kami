@@ -12,10 +12,11 @@ interface MarketingCRMProps {
   entries: MarketingCrmEntry[];
   config: MarketingConfig;
   sessionDbId: string | null;
+  paused?: boolean;
   onRefresh: () => void;
 }
 
-export default function MarketingCRM({ entries, config, sessionDbId, onRefresh }: MarketingCRMProps) {
+export default function MarketingCRM({ entries, config, sessionDbId, paused, onRefresh }: MarketingCRMProps) {
   const hasX = config.platforms.includes("x");
   const hasIg = config.platforms.includes("instagram");
   const defaultTab: CrmSubTab = hasX ? "x_outreach" : "creators";
@@ -47,11 +48,13 @@ export default function MarketingCRM({ entries, config, sessionDbId, onRefresh }
   }
 
   async function triggerDiscovery() {
-    await fetch("/api/marketing/discover", {
+    if (paused) return;
+    const res = await fetch("/api/marketing/discover", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ session_id: sessionDbId }),
     });
+    if (res.status === 423) return;
     setTimeout(onRefresh, 3000);
   }
 
@@ -81,11 +84,13 @@ export default function MarketingCRM({ entries, config, sessionDbId, onRefresh }
         <button
           className="mono"
           onClick={triggerDiscovery}
+          disabled={paused}
           style={{
             border: "1px solid var(--ink)",
             background: "transparent",
             padding: "0.3rem 0.7rem",
-            cursor: "pointer",
+            cursor: paused ? "not-allowed" : "pointer",
+            opacity: paused ? 0.5 : 1,
           }}
         >
           Run discovery
