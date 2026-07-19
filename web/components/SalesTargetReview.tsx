@@ -8,9 +8,17 @@ import type {
   SalesAccount,
   SalesPlan,
 } from "@/lib/salesTypes";
+import { scoreLabel } from "@/lib/salesMotionLabels";
+
+interface AccountContact {
+  id?: string;
+  name?: string;
+  email?: string;
+}
 
 interface AccountWithMeta extends SalesAccount {
   signals?: AccountSignal[];
+  contact?: AccountContact | null;
   score?: {
     factors: LeadScoreFactors;
     explanation: string;
@@ -21,6 +29,7 @@ interface SalesTargetReviewProps {
   sessionDbId: string | null;
   plan: SalesPlan | null;
   paused?: boolean;
+  onContinue?: () => void;
 }
 
 function isIncluded(account: SalesAccount): boolean {
@@ -30,11 +39,13 @@ function isIncluded(account: SalesAccount): boolean {
   return false;
 }
 
-export default function SalesTargetReview({ sessionDbId, plan, paused }: SalesTargetReviewProps) {
+export default function SalesTargetReview({ sessionDbId, plan, paused, onContinue }: SalesTargetReviewProps) {
   const [accounts, setAccounts] = useState<AccountWithMeta[]>([]);
   const [busy, setBusy] = useState(false);
   const [discoverMsg, setDiscoverMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [emailDrafts, setEmailDrafts] = useState<Record<string, string>>({});
+  const [savingEmailId, setSavingEmailId] = useState<string | null>(null);
 
   const planApproved = plan?.status === "approved";
 
@@ -81,7 +92,7 @@ export default function SalesTargetReview({ sessionDbId, plan, paused }: SalesTa
         setError(json.error ?? "Discovery failed");
         return;
       }
-      setDiscoverMsg(`Discovered ${json.count ?? 0} accounts`);
+      setDiscoverMsg(`Found ${json.count ?? 0} companies`);
       await fetchAccounts();
     } finally {
       setBusy(false);
@@ -98,17 +109,75 @@ export default function SalesTargetReview({ sessionDbId, plan, paused }: SalesTa
     if (res.ok) await fetchAccounts();
   }
 
-  async function approveSelected() {
+  async function saveEmail(account: AccountWithMeta) {
+    if (!sessionDbId || !account.id) return;
+    const email = (emailDrafts[account.id] ?? account.contact?.email ?? "").trim();
+    if (!email.includes("@")) return;
+
+    setSavingEmailId(account.id);
+    setError(null);
+    try {
+      const res = await fetch("/api/sales/contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionDbId,
+          account_id: account.id,
+          name: account.name,
+          email,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Could not save email");
+        return;
+      }
+      await fetchAccounts();
+    } finally {
+      setSavingEmailId(null);
+    }
+  }
+
+  async function continueWithSelected() {
     if (!sessionDbId) return;
     const selected = accounts.filter((a) => a.id && isIncluded(a));
-    if (!selected.length) return;
+    if (!selected.length) {
+      setError("Select at least one company to continue.");
+      return;
+    }
+
+    for (const acc of selected) {
+      const draft = emailDrafts[acc.id!]?.trim();
+      if (!acc.contact?.email && draft?.includes("@")) {
+        await saveEmail({ ...acc, contact: undefined });
+      } else if (!acc.contact?.email && !draft?.includes("@")) {
+        setError("Add a contact email for each selected company before continuing.");
+        return;
+      }
+    }
 
     setBusy(true);
     setError(null);
     try {
+      const accRes = await fetch(`/api/sales/accounts?session_id=${sessionDbId}`);
+      const accJson = await accRes.json();
+      const fresh = (accJson.accounts ?? []) as AccountWithMeta[];
+      const accountIds = fresh.filter((a) => a.id && isIncluded(a)).map((a) => a.id!);
+
+      if (!accountIds.length) {
+        setError("No selected companies found.");
+        return;
+      }
+
+      const missing = fresh.filter((a) => a.id && isIncluded(a) && !a.contact?.email);
+      if (missing.length) {
+        setError("Add a contact email for each selected company before continuing.");
+        return;
+      }
+
       await Promise.all(
-        selected.map((acc) =>
-          fetch(`/api/sales/accounts/${acc.id}`, {
+        accountIds.map((id) =>
+          fetch(`/api/sales/accounts/${id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ pipeline_stage: "sequencing" as PipelineStage, actor: "user" }),
@@ -116,7 +185,19 @@ export default function SalesTargetReview({ sessionDbId, plan, paused }: SalesTa
         ),
       );
 
+      const seqRes = await fetch("/api/sales/sequences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionDbId, account_ids: accountIds }),
+      });
+      const seqJson = await seqRes.json();
+      if (!seqRes.ok) {
+        setError(seqJson.error ?? "Could not create email sequences");
+        return;
+      }
+
       await fetchAccounts();
+      onContinue?.();
     } finally {
       setBusy(false);
     }
@@ -125,43 +206,46 @@ export default function SalesTargetReview({ sessionDbId, plan, paused }: SalesTa
   if (!planApproved) {
     return (
       <div className="kraft-card" style={{ padding: "var(--stack-md)", marginTop: "var(--stack-md)" }}>
-        <p className="label-caps" style={{ color: "var(--outline)" }}>Target Discovery</p>
+        <p className="label-caps" style={{ color: "var(--outline)" }}>Find companies</p>
         <p className="mono" style={{ color: "var(--ink-soft)", marginTop: "var(--stack-sm)", fontSize: 13 }}>
-          Approve the sales plan to unlock account discovery and target review.
+          Approve your plan first, then we&apos;ll research companies that match.
         </p>
       </div>
     );
   }
 
-  const includedCount = accounts.filter((a) => isIncluded(a)).length;
+  const included = accounts.filter((a) => isIncluded(a));
+  const includedCount = included.length;
 
   return (
     <div className="kraft-card" style={{ padding: "var(--stack-md)", marginTop: "var(--stack-md)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--stack-sm)" }}>
-        <p className="label-caps">Target Review</p>
+      <p className="sales-intro" style={{ marginBottom: "var(--stack-md)" }}>
+        Research companies, pick who to pursue, and add a real email for anyone you want to reach.
+      </p>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--stack-sm)", flexWrap: "wrap", gap: "var(--stack-sm)" }}>
+        <p className="label-caps">Find companies</p>
         <div style={{ display: "flex", gap: "var(--stack-sm)" }}>
           <button
             type="button"
-            className="mono"
+            className="hanko-btn"
             onClick={runDiscovery}
             disabled={busy || paused}
-            style={{
-              border: "1px solid var(--ink)",
-              background: "transparent",
-              padding: "0.3rem 0.7rem",
-              cursor: paused || busy ? "not-allowed" : "pointer",
-              opacity: paused ? 0.5 : 1,
-            }}
+            style={{ opacity: paused ? 0.5 : 1 }}
           >
-            {busy ? "…" : "Run discovery"}
+            {busy ? "…" : "Find companies"}
           </button>
-          <button
-            className="hanko-btn"
-            onClick={approveSelected}
-            disabled={busy || includedCount === 0}
-          >
-            Approve selected ({includedCount})
-          </button>
+          {includedCount > 0 && (
+            <button
+              type="button"
+              className="mono"
+              onClick={continueWithSelected}
+              disabled={busy}
+              style={{ border: "1px solid var(--ink)", background: "transparent", padding: "0.4rem 0.75rem", cursor: "pointer" }}
+            >
+              Continue with selected ({includedCount})
+            </button>
+          )}
         </div>
       </div>
       <hr className="crease" />
@@ -179,23 +263,25 @@ export default function SalesTargetReview({ sessionDbId, plan, paused }: SalesTa
 
       {!accounts.length ? (
         <p className="mono" style={{ color: "var(--ink-soft)", fontSize: 13, padding: "var(--stack-sm) 0" }}>
-          No accounts yet — run discovery to populate targets from live web signals.
+          No companies yet — click Find companies to research targets from live web signals.
         </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--stack-sm)" }}>
           {accounts.map((acc) => {
-            const included = isIncluded(acc);
+            const selected = isIncluded(acc);
             const factors = acc.score?.factors;
+            const contactEmail = acc.contact?.email ?? emailDrafts[acc.id ?? ""] ?? "";
+
             return (
               <div
                 key={acc.id}
                 style={{
                   border: "1px solid var(--outline-variant)",
                   padding: "var(--stack-sm)",
-                  opacity: included ? 1 : 0.65,
+                  opacity: selected ? 1 : 0.75,
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "0.5rem" }}>
                   <div>
                     <strong>{acc.name}</strong>
                     {acc.domain && (
@@ -204,28 +290,21 @@ export default function SalesTargetReview({ sessionDbId, plan, paused }: SalesTa
                       </span>
                     )}
                   </div>
-                  <div style={{ display: "flex", gap: "var(--stack-sm)", alignItems: "center" }}>
-                    {acc.tier != null && (
-                      <span className="mono" style={{ fontSize: 11, textTransform: "uppercase" }}>
-                        Tier {acc.tier}
-                      </span>
-                    )}
-                    <label className="mono" style={{ fontSize: 12, cursor: "pointer" }}>
-                      <input
-                        type="checkbox"
-                        checked={included}
-                        onChange={(e) => toggleInclusion(acc, e.target.checked)}
-                        style={{ marginRight: "0.35rem" }}
-                      />
-                      include
-                    </label>
-                  </div>
+                  <label className="mono" style={{ fontSize: 12, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={(e) => toggleInclusion(acc, e.target.checked)}
+                      style={{ marginRight: "0.35rem" }}
+                    />
+                    Include
+                  </label>
                 </div>
 
                 {factors && (
                   <div className="mono" style={{ fontSize: 11, color: "var(--ink-soft)", marginTop: "0.35rem" }}>
-                    fit {(factors.fit * 100).toFixed(0)}% · intent {(factors.intent * 100).toFixed(0)}% ·
-                    contact {(factors.contactability * 100).toFixed(0)}% · priority {(factors.priority * 100).toFixed(0)}%
+                    {scoreLabel("fit", factors.fit)} · {scoreLabel("intent", factors.intent)} ·{" "}
+                    {scoreLabel("contactability", factors.contactability)}
                   </div>
                 )}
                 {acc.score?.explanation && (
@@ -238,7 +317,7 @@ export default function SalesTargetReview({ sessionDbId, plan, paused }: SalesTa
                   <ul style={{ fontSize: 12, paddingLeft: "1.1rem", margin: "0.25rem 0 0" }}>
                     {acc.signals.map((sig, i) => (
                       <li key={sig.id ?? `${sig.source_url}-${i}`}>
-                        <span className="mono">{sig.signal_type}</span>
+                        {sig.detail ?? sig.signal_type}
                         {sig.source_url && (
                           <>
                             {" — "}
@@ -247,24 +326,42 @@ export default function SalesTargetReview({ sessionDbId, plan, paused }: SalesTa
                             </a>
                           </>
                         )}
-                        {sig.confidence != null && (
-                          <span style={{ color: "var(--outline)" }}>
-                            {" "}
-                            ({(sig.confidence * 100).toFixed(0)}% conf)
-                          </span>
-                        )}
                       </li>
                     ))}
                   </ul>
                 ) : (
                   <p className="mono" style={{ fontSize: 11, color: "var(--outline)", marginTop: "0.25rem" }}>
-                    no verifiable signals
+                    No public signal yet — you can still include if they fit your ICP.
                   </p>
                 )}
 
-                <p className="mono" style={{ fontSize: 10, color: "var(--outline)", marginTop: "0.25rem", textTransform: "uppercase" }}>
-                  {acc.pipeline_stage}
-                </p>
+                {selected && (
+                  <div className="sales-inline-email">
+                    {acc.contact?.email ? (
+                      <span className="mono" style={{ fontSize: 12 }}>Email: {acc.contact.email}</span>
+                    ) : (
+                      <>
+                        <input
+                          type="email"
+                          placeholder="Add contact email"
+                          value={emailDrafts[acc.id ?? ""] ?? ""}
+                          onChange={(e) =>
+                            setEmailDrafts((d) => ({ ...d, [acc.id!]: e.target.value }))
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="mono"
+                          disabled={savingEmailId === acc.id}
+                          onClick={() => saveEmail(acc)}
+                          style={{ border: "1px solid var(--ink)", background: "transparent", padding: "0.3rem 0.6rem", cursor: "pointer", fontSize: 11 }}
+                        >
+                          Save
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}

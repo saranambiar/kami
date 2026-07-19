@@ -1,76 +1,92 @@
 "use client";
 
-import { useState } from "react";
-import type { SalesCampaignConfig, SalesChannel, SalesIcp } from "@/lib/salesTypes";
+import { useEffect, useMemo, useState } from "react";
+import type { Dossier } from "@/lib/hermes";
+import {
+  configToNlPrefill,
+  dossierToNlPrefill,
+  nlPrefillToConfig,
+  type SalesNlPrefill,
+} from "@/lib/salesDossierPrefill";
+import type { SalesCampaignConfig, SalesChannel } from "@/lib/salesTypes";
 
 interface SalesSetupProps {
   sessionDbId: string | null;
+  dossier: Dossier | null;
+  domain: string;
+  existingConfig?: SalesCampaignConfig | null;
   onComplete: (config: SalesCampaignConfig, planGenerated: boolean) => void;
 }
 
-const CHANNELS: { key: SalesChannel; label: string }[] = [
-  { key: "email", label: "Email" },
-  { key: "x", label: "X (DM)" },
-];
+const QTY_OPTIONS = [10, 15, 25] as const;
 
-export default function SalesSetup({ sessionDbId, onComplete }: SalesSetupProps) {
-  const [offer, setOffer] = useState("");
-  const [icpTitles, setIcpTitles] = useState("");
-  const [icpIndustries, setIcpIndustries] = useState("");
-  const [icpSize, setIcpSize] = useState("50-500");
-  const [geo, setGeo] = useState("");
+export default function SalesSetup({
+  sessionDbId,
+  dossier,
+  domain,
+  existingConfig,
+  onComplete,
+}: SalesSetupProps) {
+  const initial = useMemo(
+    () => (existingConfig ? configToNlPrefill(existingConfig) : dossierToNlPrefill(dossier, domain)),
+    [existingConfig, dossier, domain],
+  );
+
+  const [whoSentence, setWhoSentence] = useState(initial.whoSentence);
+  const [whatSentence, setWhatSentence] = useState(initial.whatSentence);
+  const [targetQty, setTargetQty] = useState(initial.targetQty);
+  const [showDetails, setShowDetails] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [icpTitles, setIcpTitles] = useState(initial.icpTitles);
+  const [icpIndustries, setIcpIndustries] = useState(initial.icpIndustries);
+  const [geo, setGeo] = useState(initial.geo);
   const [exclusions, setExclusions] = useState("");
   const [dealMin, setDealMin] = useState("");
   const [dealMax, setDealMax] = useState("");
-  const [targetQty, setTargetQty] = useState(50);
-  const [dailyCap, setDailyCap] = useState(35);
-  const [channels, setChannels] = useState<SalesChannel[]>(["email"]);
-  const [approvedClaims, setApprovedClaims] = useState("");
-  const [senderName, setSenderName] = useState("");
-  const [senderEmail, setSenderEmail] = useState("");
-  const [autoFollowups, setAutoFollowups] = useState(true);
-  const [requireFirstSendApproval, setRequireFirstSendApproval] = useState(true);
+  const [dailyCap, setDailyCap] = useState(existingConfig?.daily_send_cap ?? 35);
+  const [senderName, setSenderName] = useState(existingConfig?.sender_identity?.name ?? "");
+  const [senderEmail, setSenderEmail] = useState(existingConfig?.sender_identity?.email ?? "");
+  const [autoFollowups, setAutoFollowups] = useState(existingConfig?.autonomy?.auto_followups ?? true);
+  const [requireFirstSendApproval, setRequireFirstSendApproval] = useState(
+    existingConfig?.autonomy?.require_first_send_approval ?? true,
+  );
+  const [channels] = useState<SalesChannel[]>(existingConfig?.allowed_channels ?? ["email"]);
   const [saving, setSaving] = useState(false);
 
-  function toggleChannel(c: SalesChannel) {
-    setChannels((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
-  }
+  useEffect(() => {
+    setWhoSentence(initial.whoSentence);
+    setWhatSentence(initial.whatSentence);
+    setTargetQty(initial.targetQty);
+    setIcpTitles(initial.icpTitles);
+    setIcpIndustries(initial.icpIndustries);
+    setGeo(initial.geo);
+  }, [initial]);
 
   async function submit() {
-    if (!sessionDbId || !offer || channels.length === 0) return;
+    if (!sessionDbId || !whatSentence.trim()) return;
     setSaving(true);
 
-    const icp: SalesIcp = {
-      titles: icpTitles.split(",").map((s) => s.trim()).filter(Boolean),
-      industries: icpIndustries.split(",").map((s) => s.trim()).filter(Boolean),
-      size: icpSize,
+    const prefill: SalesNlPrefill = {
+      whoSentence,
+      whatSentence,
+      targetQty,
+      icpTitles,
+      icpIndustries,
       geo,
+      offer: whatSentence.slice(0, 280),
     };
 
-    const payload: SalesCampaignConfig = {
-      session_id: sessionDbId,
-      offer,
-      icp,
-      geo,
-      exclusions: exclusions.split("\n").map((s) => s.trim()).filter(Boolean),
-      deal_range: {
-        min: dealMin ? Number(dealMin) : undefined,
-        max: dealMax ? Number(dealMax) : undefined,
-        currency: "USD",
-      },
-      approved_claims: approvedClaims.split("\n").map((s) => s.trim()).filter(Boolean),
-      target_quantity: targetQty,
-      daily_send_cap: dailyCap,
-      allowed_channels: channels,
-      sender_identity: senderName
-        ? { name: senderName, email: senderEmail || undefined }
-        : undefined,
-      autonomy: {
-        paused: false,
-        auto_followups: autoFollowups,
-        require_first_send_approval: requireFirstSendApproval,
-      },
-    };
+    const payload = nlPrefillToConfig(sessionDbId, prefill, {
+      exclusions,
+      dealMin,
+      dealMax,
+      dailyCap,
+      senderName,
+      senderEmail,
+      autoFollowups,
+      requireFirstSendApproval,
+      channels,
+    });
 
     try {
       const res = await fetch("/api/sales/setup", {
@@ -100,8 +116,11 @@ export default function SalesSetup({ sessionDbId, onComplete }: SalesSetupProps)
   }
 
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto", paddingTop: "var(--stack-lg)" }}>
-      <h3 style={{ marginBottom: "var(--stack-md)" }}>Set up Sales</h3>
+    <div className="sales-panel" style={{ paddingTop: "var(--stack-md)" }}>
+      <h3 style={{ marginBottom: "var(--stack-sm)" }}>Confirm who and what</h3>
+      <p className="sales-intro">
+        We filled this from your company research. Edit anything that looks wrong, then we&apos;ll show you a plan.
+      </p>
 
       {!sessionDbId && (
         <p className="mono" style={{ color: "var(--hanko)", marginBottom: "var(--stack-md)" }}>
@@ -110,113 +129,134 @@ export default function SalesSetup({ sessionDbId, onComplete }: SalesSetupProps)
       )}
 
       <div className="form-line" style={{ marginBottom: "var(--stack-md)" }}>
-        <label className="mono label-caps" htmlFor="offer">Offer / value prop</label>
-        <input id="offer" value={offer} onChange={(e) => setOffer(e.target.value)} placeholder="What are you selling?" />
-      </div>
-
-      <p className="label-caps" style={{ marginBottom: "var(--stack-sm)" }}>ICP</p>
-      <div style={{ display: "flex", gap: "var(--stack-md)", flexWrap: "wrap", marginBottom: "var(--stack-md)" }}>
-        <div className="form-line" style={{ flex: 1, minWidth: 180 }}>
-          <label className="mono label-caps" htmlFor="icp-titles">Titles (comma-separated)</label>
-          <input id="icp-titles" value={icpTitles} onChange={(e) => setIcpTitles(e.target.value)} placeholder="VP Sales, Head of Growth" />
-        </div>
-        <div className="form-line" style={{ flex: 1, minWidth: 180 }}>
-          <label className="mono label-caps" htmlFor="icp-industries">Industries</label>
-          <input id="icp-industries" value={icpIndustries} onChange={(e) => setIcpIndustries(e.target.value)} placeholder="SaaS, fintech" />
-        </div>
-        <div className="form-line" style={{ flex: 1, minWidth: 120 }}>
-          <label className="mono label-caps" htmlFor="icp-size">Company size</label>
-          <input id="icp-size" value={icpSize} onChange={(e) => setIcpSize(e.target.value)} />
-        </div>
-        <div className="form-line" style={{ flex: 1, minWidth: 120 }}>
-          <label className="mono label-caps" htmlFor="geo">Geography</label>
-          <input id="geo" value={geo} onChange={(e) => setGeo(e.target.value)} placeholder="US, UK" />
-        </div>
+        <label className="mono label-caps" htmlFor="who-sentence">
+          Who should we try to book meetings with?
+        </label>
+        <textarea
+          id="who-sentence"
+          className="sales-textarea"
+          value={whoSentence}
+          onChange={(e) => setWhoSentence(e.target.value)}
+        />
       </div>
 
       <div className="form-line" style={{ marginBottom: "var(--stack-md)" }}>
-        <label className="mono label-caps" htmlFor="exclusions">Exclusions (one per line: domains, companies)</label>
-        <textarea id="exclusions" rows={2} value={exclusions} onChange={(e) => setExclusions(e.target.value)} />
-      </div>
-
-      <div style={{ display: "flex", gap: "var(--stack-md)", flexWrap: "wrap", marginBottom: "var(--stack-md)" }}>
-        <div className="form-line" style={{ flex: 1, minWidth: 100 }}>
-          <label className="mono label-caps" htmlFor="deal-min">Deal min ($)</label>
-          <input id="deal-min" type="number" value={dealMin} onChange={(e) => setDealMin(e.target.value)} />
-        </div>
-        <div className="form-line" style={{ flex: 1, minWidth: 100 }}>
-          <label className="mono label-caps" htmlFor="deal-max">Deal max ($)</label>
-          <input id="deal-max" type="number" value={dealMax} onChange={(e) => setDealMax(e.target.value)} />
-        </div>
-        <div className="form-line" style={{ flex: 1, minWidth: 100 }}>
-          <label className="mono label-caps" htmlFor="target-qty">Target accounts</label>
-          <input id="target-qty" type="number" min={1} value={targetQty} onChange={(e) => setTargetQty(Number(e.target.value))} />
-        </div>
-        <div className="form-line" style={{ flex: 1, minWidth: 100 }}>
-          <label className="mono label-caps" htmlFor="daily-cap">Daily send cap</label>
-          <input id="daily-cap" type="number" min={1} value={dailyCap} onChange={(e) => setDailyCap(Number(e.target.value))} />
-        </div>
-      </div>
-
-      <p className="label-caps" style={{ marginBottom: "var(--stack-sm)" }}>Channels</p>
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "var(--stack-md)" }}>
-        {CHANNELS.map((c) => (
-          <button
-            key={c.key}
-            type="button"
-            className="mono"
-            onClick={() => toggleChannel(c.key)}
-            style={{
-              background: channels.includes(c.key) ? "var(--kraft)" : "transparent",
-              border: "1px solid var(--ink)",
-              padding: "0.4rem 0.75rem",
-              cursor: "pointer",
-            }}
-          >
-            {channels.includes(c.key) ? "✓ " : "· "}{c.label}
-          </button>
-        ))}
+        <label className="mono label-caps" htmlFor="what-sentence">
+          What should we say you help with?
+        </label>
+        <textarea
+          id="what-sentence"
+          className="sales-textarea"
+          value={whatSentence}
+          onChange={(e) => setWhatSentence(e.target.value)}
+        />
       </div>
 
       <div className="form-line" style={{ marginBottom: "var(--stack-md)" }}>
-        <label className="mono label-caps" htmlFor="claims">Approved claims (one per line)</label>
-        <textarea id="claims" rows={3} value={approvedClaims} onChange={(e) => setApprovedClaims(e.target.value)} placeholder="3x reply rate with signal-based outreach" />
-      </div>
-
-      <p className="label-caps" style={{ marginBottom: "var(--stack-sm)" }}>Sender identity</p>
-      <div style={{ display: "flex", gap: "var(--stack-md)", marginBottom: "var(--stack-md)" }}>
-        <div className="form-line" style={{ flex: 1 }}>
-          <label className="mono label-caps" htmlFor="sender-name">Name</label>
-          <input id="sender-name" value={senderName} onChange={(e) => setSenderName(e.target.value)} />
+        <label className="mono label-caps">How many companies should we research first?</label>
+        <div className="sales-qty-chips">
+          {QTY_OPTIONS.map((n) => (
+            <button
+              key={n}
+              type="button"
+              className="sales-qty-chip"
+              data-active={targetQty === n}
+              onClick={() => setTargetQty(n)}
+            >
+              {n}
+            </button>
+          ))}
         </div>
-        <div className="form-line" style={{ flex: 1 }}>
-          <label className="mono label-caps" htmlFor="sender-email">Email</label>
-          <input id="sender-email" type="email" value={senderEmail} onChange={(e) => setSenderEmail(e.target.value)} />
+      </div>
+
+      <button
+        type="button"
+        className="mono"
+        onClick={() => setShowDetails(!showDetails)}
+        style={{
+          border: "none",
+          background: "none",
+          padding: 0,
+          cursor: "pointer",
+          textDecoration: "underline",
+          fontSize: 12,
+          marginBottom: "var(--stack-md)",
+        }}
+      >
+        {showDetails ? "Hide details" : "Edit details"}
+      </button>
+
+      {showDetails && (
+        <div style={{ display: "flex", gap: "var(--stack-md)", flexWrap: "wrap", marginBottom: "var(--stack-md)" }}>
+          <div className="form-line" style={{ flex: 1, minWidth: 180 }}>
+            <label className="mono label-caps" htmlFor="icp-titles">Titles</label>
+            <input id="icp-titles" value={icpTitles} onChange={(e) => setIcpTitles(e.target.value)} />
+          </div>
+          <div className="form-line" style={{ flex: 1, minWidth: 180 }}>
+            <label className="mono label-caps" htmlFor="icp-industries">Industries</label>
+            <input id="icp-industries" value={icpIndustries} onChange={(e) => setIcpIndustries(e.target.value)} />
+          </div>
+          <div className="form-line" style={{ flex: 1, minWidth: 120 }}>
+            <label className="mono label-caps" htmlFor="geo">Geography</label>
+            <input id="geo" value={geo} onChange={(e) => setGeo(e.target.value)} placeholder="US, UK" />
+          </div>
         </div>
-      </div>
+      )}
 
-      <p className="label-caps" style={{ marginBottom: "var(--stack-sm)" }}>Autonomy</p>
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "var(--stack-lg)" }}>
-        <button
-          type="button"
-          className="mono"
-          onClick={() => setAutoFollowups(!autoFollowups)}
-          style={{ background: autoFollowups ? "var(--kraft)" : "transparent", border: "1px solid var(--ink)", padding: "0.4rem 0.75rem", cursor: "pointer", textAlign: "left" }}
-        >
-          {autoFollowups ? "✓" : "·"} Auto follow-ups (within approved sequence)
-        </button>
-        <button
-          type="button"
-          className="mono"
-          onClick={() => setRequireFirstSendApproval(!requireFirstSendApproval)}
-          style={{ background: requireFirstSendApproval ? "var(--kraft)" : "transparent", border: "1px solid var(--ink)", padding: "0.4rem 0.75rem", cursor: "pointer", textAlign: "left" }}
-        >
-          {requireFirstSendApproval ? "✓" : "·"} Require approval before first send
-        </button>
-      </div>
+      <details className="sales-disclosure" style={{ marginBottom: "var(--stack-lg)" }}>
+        <summary>Advanced</summary>
+        <div style={{ paddingTop: "var(--stack-sm)" }}>
+          <div className="form-line" style={{ marginBottom: "var(--stack-sm)" }}>
+            <label className="mono label-caps" htmlFor="exclusions">Exclusions (one per line)</label>
+            <textarea id="exclusions" className="sales-textarea" rows={2} value={exclusions} onChange={(e) => setExclusions(e.target.value)} />
+          </div>
+          <div style={{ display: "flex", gap: "var(--stack-md)", flexWrap: "wrap", marginBottom: "var(--stack-sm)" }}>
+            <div className="form-line" style={{ flex: 1, minWidth: 100 }}>
+              <label className="mono label-caps" htmlFor="deal-min">Deal min ($)</label>
+              <input id="deal-min" type="number" value={dealMin} onChange={(e) => setDealMin(e.target.value)} />
+            </div>
+            <div className="form-line" style={{ flex: 1, minWidth: 100 }}>
+              <label className="mono label-caps" htmlFor="deal-max">Deal max ($)</label>
+              <input id="deal-max" type="number" value={dealMax} onChange={(e) => setDealMax(e.target.value)} />
+            </div>
+            <div className="form-line" style={{ flex: 1, minWidth: 100 }}>
+              <label className="mono label-caps" htmlFor="daily-cap">Daily send cap</label>
+              <input id="daily-cap" type="number" min={1} value={dailyCap} onChange={(e) => setDailyCap(Number(e.target.value))} />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "var(--stack-md)", marginBottom: "var(--stack-sm)" }}>
+            <div className="form-line" style={{ flex: 1 }}>
+              <label className="mono label-caps" htmlFor="sender-name">Sender name</label>
+              <input id="sender-name" value={senderName} onChange={(e) => setSenderName(e.target.value)} />
+            </div>
+            <div className="form-line" style={{ flex: 1 }}>
+              <label className="mono label-caps" htmlFor="sender-email">Sender email</label>
+              <input id="sender-email" type="email" value={senderEmail} onChange={(e) => setSenderEmail(e.target.value)} />
+            </div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <button
+              type="button"
+              className="mono"
+              onClick={() => setAutoFollowups(!autoFollowups)}
+              style={{ background: autoFollowups ? "var(--kraft)" : "transparent", border: "1px solid var(--ink)", padding: "0.4rem 0.75rem", cursor: "pointer", textAlign: "left" }}
+            >
+              {autoFollowups ? "✓" : "·"} Auto follow-ups
+            </button>
+            <button
+              type="button"
+              className="mono"
+              onClick={() => setRequireFirstSendApproval(!requireFirstSendApproval)}
+              style={{ background: requireFirstSendApproval ? "var(--kraft)" : "transparent", border: "1px solid var(--ink)", padding: "0.4rem 0.75rem", cursor: "pointer", textAlign: "left" }}
+            >
+              {requireFirstSendApproval ? "✓" : "·"} Require approval before first send
+            </button>
+          </div>
+        </div>
+      </details>
 
-      <button className="hanko-btn" onClick={submit} disabled={!sessionDbId || !offer || channels.length === 0 || saving}>
-        {saving ? "Saving…" : "Launch Sales"}
+      <button className="hanko-btn" onClick={submit} disabled={!sessionDbId || !whatSentence.trim() || saving}>
+        {saving ? "Saving…" : "Looks good — show plan"}
       </button>
     </div>
   );

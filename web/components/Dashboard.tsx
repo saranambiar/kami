@@ -8,7 +8,7 @@ import IntelPanel from "@/components/IntelPanel";
 import CmoChat from "@/components/CmoChat";
 import CampaignTabs from "@/components/CampaignTabs";
 import MarketingPanel from "@/components/MarketingPanel";
-import SalesPanel from "@/components/SalesPanel";
+import SalesPanel, { type SalesGuidedStep } from "@/components/SalesPanel";
 import type { Dossier } from "@/lib/hermes";
 import type { CampaignTab, MarketingConfig } from "@/lib/marketingTypes";
 import type { SalesCampaignConfig } from "@/lib/salesTypes";
@@ -53,6 +53,12 @@ export default function Dashboard({
   onSalesSetup,
 }: DashboardProps) {
   const [tab, setTab] = useState<CampaignTab>("overview");
+  const [salesFocusStep, setSalesFocusStep] = useState<SalesGuidedStep | null>(null);
+
+  function runOutbound() {
+    setTab("sales");
+    setSalesFocusStep(salesConfig ? null : "confirm");
+  }
 
   return (
     <div style={{ paddingTop: "var(--stack-md)", paddingBottom: "var(--stack-lg)" }}>
@@ -85,6 +91,16 @@ export default function Dashboard({
       {tab === "overview" && (
         <>
           <hr className="crease" />
+          {dossier && (
+            <div style={{ marginTop: "var(--stack-md)", marginBottom: "var(--stack-sm)" }}>
+              <button type="button" className="hanko-btn" onClick={runOutbound}>
+                Run outbound
+              </button>
+              <p className="mono" style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: "0.5rem" }}>
+                Start sales from your company research — confirm who to reach, then find companies.
+              </p>
+            </div>
+          )}
           <div className="dashboard-grid">
             {/* LEFT — channels */}
             <ChannelRail connected={connectedChannels} onConnect={onConnect} />
@@ -144,6 +160,9 @@ export default function Dashboard({
         <SalesPanel
           sessionDbId={sessionDbId}
           config={salesConfig}
+          dossier={dossier}
+          domain={domain}
+          focusStep={salesFocusStep}
           onSetup={onSalesSetup}
         />
       )}

@@ -236,3 +236,110 @@ h3 {
   color: var(--outline);
   cursor: default;
 }
+
+/* Sales founder flow */
+.sales-panel {
+  width: 100%;
+  max-width: none;
+}
+
+.sales-intro {
+  font-size: 15px;
+  color: var(--ink-soft);
+  margin-bottom: var(--stack-md);
+  max-width: 52rem;
+}
+
+.sales-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 0.75rem 0.85rem;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  resize: vertical;
+}
+
+.sales-qty-chips {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.35rem;
+}
+
+.sales-qty-chip {
+  border: 1px solid var(--ink);
+  background: transparent;
+  padding: 0.45rem 0.85rem;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.sales-qty-chip[data-active="true"] {
+  background: var(--kraft);
+}
+
+.sales-stepper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  margin: var(--stack-md) 0;
+  align-items: center;
+}
+
+.sales-step {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--outline-variant);
+  color: var(--ink-soft);
+  background: transparent;
+  cursor: default;
+}
+
+.sales-step[data-active="true"] {
+  border-color: var(--hanko);
+  color: var(--ink);
+  background: var(--kraft);
+}
+
+.sales-step[data-done="true"] {
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.sales-disclosure {
+  margin-top: var(--stack-sm);
+  font-size: 13px;
+}
+
+.sales-disclosure summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+
+.sales-inline-email {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+  align-items: center;
+}
+
+.sales-inline-email input {
+  flex: 1;
+  min-width: 180px;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--outline);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
