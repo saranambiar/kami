@@ -9,7 +9,7 @@ interface CampaignTabsProps {
 
 const TABS: { key: CampaignTab | "coming1" | "coming2"; label: string; disabled?: boolean }[] = [
   { key: "overview", label: "Overview" },
-  { key: "sales", label: "Sales", disabled: true },
+  { key: "sales", label: "Sales" },
   { key: "marketing", label: "Marketing" },
   { key: "coming1", label: "Coming Soon", disabled: true },
   { key: "coming2", label: "Coming Soon", disabled: true },

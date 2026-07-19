@@ -8,8 +8,10 @@ import IntelPanel from "@/components/IntelPanel";
 import CmoChat from "@/components/CmoChat";
 import CampaignTabs from "@/components/CampaignTabs";
 import MarketingPanel from "@/components/MarketingPanel";
+import SalesPanel from "@/components/SalesPanel";
 import type { Dossier } from "@/lib/hermes";
 import type { CampaignTab, MarketingConfig } from "@/lib/marketingTypes";
+import type { SalesCampaignConfig } from "@/lib/salesTypes";
 
 interface DashboardProps {
   domain: string;
@@ -22,11 +24,13 @@ interface DashboardProps {
   sessionDbId: string | null;
   connectedChannels: string[];
   marketingConfig: MarketingConfig | null;
+  salesConfig: SalesCampaignConfig | null;
   onConnect: (platform: string) => void;
   onNewCampaign: () => void;
   onApprove: (title: string, playbook: string) => void;
   onDismiss: (title: string) => void;
   onMarketingSetup: (config: MarketingConfig) => void;
+  onSalesSetup: (config: SalesCampaignConfig) => void;
 }
 
 export default function Dashboard({
@@ -40,11 +44,13 @@ export default function Dashboard({
   sessionDbId,
   connectedChannels,
   marketingConfig,
+  salesConfig,
   onConnect,
   onNewCampaign,
   onApprove,
   onDismiss,
   onMarketingSetup,
+  onSalesSetup,
 }: DashboardProps) {
   const [tab, setTab] = useState<CampaignTab>("overview");
 
@@ -127,7 +133,6 @@ export default function Dashboard({
 
       {tab === "marketing" && (
         <MarketingPanel
-          sessionId={sessionId}
           sessionDbId={sessionDbId}
           config={marketingConfig}
           dossierTone={dossier?.tone}
@@ -136,11 +141,11 @@ export default function Dashboard({
       )}
 
       {tab === "sales" && (
-        <div style={{ marginTop: "var(--stack-md)", textAlign: "center", padding: "var(--stack-lg) 0" }}>
-          <p className="label-caps" style={{ color: "var(--outline)" }}>
-            Sales — Coming Soon
-          </p>
-        </div>
+        <SalesPanel
+          sessionDbId={sessionDbId}
+          config={salesConfig}
+          onSetup={onSalesSetup}
+        />
       )}
     </div>
   );

@@ -9,6 +9,7 @@ import { newSessionId, parseDossier, streamChat, type Dossier as DossierData } f
 import { createSession, persist } from "@/lib/persist";
 import { executePrompt, onboardingPrompt } from "@/lib/prompts";
 import type { MarketingConfig } from "@/lib/marketingTypes";
+import type { SalesCampaignConfig } from "@/lib/salesTypes";
 
 type View = "landing" | "dashboard";
 
@@ -22,6 +23,7 @@ export default function Home() {
   const [executing, setExecuting] = useState(false);
   const [connectedChannels, setConnectedChannels] = useState<string[]>([]);
   const [marketingConfig, setMarketingConfig] = useState<MarketingConfig | null>(null);
+  const [salesConfig, setSalesConfig] = useState<SalesCampaignConfig | null>(null);
   const sessionRef = useRef(newSessionId());
   const dbIdRef = useRef<string | null>(null);
   const persistedCount = useRef(0);
@@ -51,6 +53,18 @@ export default function Home() {
         const statuses: Record<string, OpportunityStatus> = {};
         for (const o of data.opportunities ?? []) statuses[o.title] = o.status;
         setOppStatus(statuses);
+        fetch(`/api/marketing/setup?session_id=${dbId}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((mc) => {
+            if (mc?.config) setMarketingConfig(mc.config as MarketingConfig);
+          })
+          .catch(() => {});
+        fetch(`/api/sales/setup?session_id=${dbId}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((sc) => {
+            if (sc?.config) setSalesConfig(sc.config as SalesCampaignConfig);
+          })
+          .catch(() => {});
         setView("dashboard");
       })
       .catch(() => {});
@@ -274,6 +288,8 @@ export default function Home() {
     setEvents([]);
     setDossier(null);
     setOppStatus({});
+    setMarketingConfig(null);
+    setSalesConfig(null);
     dbIdRef.current = null;
     persistedCount.current = 0;
   }
@@ -303,11 +319,13 @@ export default function Home() {
           sessionDbId={dbIdRef.current}
           connectedChannels={connectedChannels}
           marketingConfig={marketingConfig}
+          salesConfig={salesConfig}
           onConnect={connectChannel}
           onApprove={approve}
           onDismiss={dismiss}
           onNewCampaign={newCampaign}
           onMarketingSetup={setMarketingConfig}
+          onSalesSetup={setSalesConfig}
         />
       )}
     </main>
