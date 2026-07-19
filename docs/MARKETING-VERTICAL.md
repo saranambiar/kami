@@ -1,124 +1,97 @@
 # Marketing Vertical — Codebase Overview
 
-> Living doc. Updated as features land on `feature/marketing`.
-> Last updated: 2026-07-15
+> Living doc. Updated post-merge to `dev` (Phase 0 fixes).
+> Last updated: 2026-07-18
 
-## Status: MVP code complete, not yet merged to `dev`/`main`
+## Status: Merged to `dev`, Phase 0 fixes applied
 
 ---
 
-## Where everything lives
+## Session ID rule
 
-### Frontend Components (`web/components/`)
+Marketing persistence uses **`sessionDbId`** — the Supabase UUID from `agent_sessions.id`.
 
-| File | What it does |
-|------|-------------|
-| `CampaignTabs.tsx` | Tab bar added to Dashboard — Overview, Sales (disabled), Marketing, 2x Coming Soon |
-| `MarketingPanel.tsx` | Container for the whole marketing tab. Shows setup wizard if no config, otherwise the 3-column layout |
-| `MarketingSetup.tsx` | Guided setup wizard — platform selection (X/Instagram), budgets, niche keywords, tone |
-| `PlatformRail.tsx` | Left column — X and IG summary cards with lead/creator counts, budget info |
-| `MarketingCRM.tsx` | Center column — sub-tabs for X Outreach and Creators, discovery trigger button |
-| `BoostManager.tsx` | Inside CRM center — shows user's X posts with boost buttons + active boost metrics |
-| `LeadTable.tsx` | X leads table — batch approve, relevance scores, status chips |
-| `CreatorTable.tsx` | IG creators table — expandable rows with reasoning, niche match, calendar status |
-| `ConversationsPanel.tsx` | Right column — list of all active DM conversations, platform filter |
-| `ConversationThread.tsx` | Expanded view of a single conversation — message history, manual takeover input |
-| `EscalationBanner.tsx` | Red banner when Kami needs user approval — approve/counter/decline buttons |
-| `StatusChip.tsx` | Reusable colored chip (positive/action/neutral/terminal variants) |
-| `KillSwitch.tsx` | Global pause/resume toggle for all autonomous conversations |
+- **Do not** pass the Hermes `X-Hermes-Session-Id` string to marketing APIs.
+- Frontend: `page.tsx` holds `dbIdRef.current`; passes `sessionDbId` to `MarketingPanel` / `MarketingSetup`.
+- All marketing API routes expect `session_id` = Supabase UUID.
 
-### Modified existing files
+---
 
-| File | What changed |
-|------|-------------|
-| `web/components/Dashboard.tsx` | Added tab state, CampaignTabs bar, conditional rendering by tab. Marketing tab renders `<MarketingPanel>` |
-| `web/app/page.tsx` | Added `marketingConfig` state, passes it + `sessionDbId` to Dashboard |
-| `web/app/globals.css` | Added `.campaign-tabs` and `.campaign-tab` styles |
+## Supabase tables (`web/supabase/migrations/003_marketing.sql`)
 
-### API Routes (`web/app/api/`)
+Namespaced to avoid Sales vertical clash:
 
-| Route | Method | What it does |
-|-------|--------|-------------|
-| `marketing/setup` | GET, POST | Fetch or upsert marketing config (platforms, budgets, niche, tone) |
-| `marketing/crm` | GET, POST | List CRM entries (filterable) or create/upsert by platform+handle |
-| `marketing/discover` | POST | Triggers lead/creator discovery (delegates to Hermes agent) |
-| `conversations` | GET | List conversations with CRM join, filterable by session_id |
-| `conversations/[id]` | GET, POST | Get message thread / send manual message / handle escalation |
-| `conversations/poll` | POST | Cron endpoint — checks for stale conversations (3+ days no reply) |
-| `x/posts` | GET | Fetch user's recent X posts with engagement metrics |
-| `x/boost` | GET, POST | Create boost campaign record / list active boosts |
-| `calendar/event` | POST | Create Google Calendar event with attendees |
+| Table | Purpose |
+|-------|---------|
+| `marketing_config` | Platform selection, budgets, niche, tone, **`autonomous_paused`** per session (`session_id` unique → `agent_sessions.id`) |
+| `marketing_crm` | X leads + IG creators. **Unique on `(session_id, platform, handle)`** — not global |
+| `marketing_conversations` | Autonomous DM threads (was `conversations`) |
+| `marketing_conversation_messages` | Messages per thread (was `conversation_messages`) |
+| `boost_campaigns` | X post boost records |
 
-### Lib Modules (`web/lib/`)
+Apply migration in Supabase before using marketing features in production.
 
-| File | What it does |
-|------|-------------|
-| `marketingTypes.ts` | All TypeScript types for the marketing vertical |
-| `googleCalendar.ts` | Google Calendar API client — token refresh + event creation |
-| `instagram.ts` | Instagram Graph API client — hashtag search, email extraction |
+---
 
-### Hermes Agents (`agents/`)
+## Kill switch (persisted)
+
+- DB column: `marketing_config.autonomous_paused` (default `false`)
+- UI: `KillSwitch.tsx` — controlled component; `onChange` persists via `PATCH /api/marketing/setup`
+- Server enforcement:
+  - `POST /api/marketing/discover` → **423** when paused
+  - `POST /api/conversations/poll` → skips stalled/reply checks for paused sessions
+- Frontend: discovery button disabled when paused; config reloaded on session resume via `GET /api/marketing/setup`
+
+---
+
+## API routes
+
+| Route | Method | Notes |
+|-------|--------|-------|
+| `marketing/setup` | GET, POST, PATCH | GET by `session_id`; POST upserts config; PATCH updates `autonomous_paused` only |
+| `marketing/crm` | GET, POST | GET filtered by session; POST upserts by `(session_id, platform, handle)` or updates by `id` + `status` (approve flows) |
+| `marketing/discover` | POST | Stub Hermes dispatch; returns 423 if paused |
+| `conversations` | GET | Queries `marketing_conversations` joined to `marketing_crm` |
+| `conversations/[id]` | GET, POST | Uses `marketing_conversation_messages` |
+| `conversations/poll` | POST | Cron stub; respects `autonomous_paused` |
+| `x/boost` | GET, POST | `boost_campaigns` table |
+
+---
+
+## Frontend components
 
 | File | Role |
 |------|------|
-| `marketing-researcher.md` | Discovers and ranks X leads + IG creators from ICP/niche keywords |
-| `conversation-agent.md` | Autonomous DM specialist — impersonates user, follows persona rules |
-| `boost-manager.md` | X Ads campaign planning — budget allocation, targeting strategy |
-
-### Runtime Skills (`skills/`)
-
-| Skill | Purpose |
-|-------|---------|
-| `creator_outreach/SKILL.md` | Playbook for first message, negotiation, deal closing with IG creators |
-| `x_cold_dm/SKILL.md` | Cold DM opener rules, conversation flow, rate limits |
-| `persona_mimic/SKILL.md` | User impersonation rules — tone matching, drift detection, anti-AI-detection |
+| `MarketingSetup.tsx` | POSTs setup with `sessionDbId` |
+| `MarketingPanel.tsx` | Wires kill switch persistence; passes `sessionDbId` |
+| `KillSwitch.tsx` | Controlled pause toggle |
+| `MarketingCRM.tsx` | Approve-by-id via CRM POST; discovery respects pause |
+| `page.tsx` | Loads marketing config on resume; clears on new campaign |
 
 ---
 
-## Supabase Tables (need to be created)
-
-These tables are referenced by the API routes but need to be created in Supabase:
-
-- `marketing_config` — platform selection, budgets, niche, tone per session
-- `marketing_crm` — leads (X) and creators (IG) with status, scores, metadata
-- `conversations` — autonomous DM conversations linked to CRM entries
-- `conversation_messages` — individual messages in each conversation
-- `boost_campaigns` — X post boost campaign records with spend/metrics
-
-SQL for these is in the implementation plan: `docs/superpowers/plans/2026-07-15-marketing-vertical.md`
-
----
-
-## Architecture at a glance
+## Architecture
 
 ```
 Dashboard
-└── CampaignTabs [Overview | Sales | Marketing | ...]
-    └── MarketingPanel (marketing tab)
-        ├── PlatformRail (left) — X/IG summary cards
-        ├── MarketingCRM (center)
-        │   ├── BoostManager — post boosting
-        │   ├── LeadTable — X cold outreach targets
-        │   └── CreatorTable — IG creator partnerships
-        └── ConversationsPanel (right)
-            └── ConversationThread — expanded DM view
-                └── EscalationBanner — when Kami needs approval
+└── CampaignTabs [Overview | Sales | Marketing]
+    └── MarketingPanel
+        ├── KillSwitch → PATCH marketing/setup
+        ├── PlatformRail
+        ├── MarketingCRM → POST marketing/crm (approve by id)
+        └── ConversationsPanel → marketing_conversations API
 ```
 
-## What's NOT done yet
+---
 
-- Real X Ads API integration (boost campaigns log intent, don't call X Ads yet)
-- Real platform reply detection in poll route (hook point exists, no API calls)
-- Hermes gateway wiring for discovery + conversation agents (routes return placeholder responses)
-- Supabase table creation (SQL is written, needs to be applied)
+## Remaining stubs (not yet wired)
+
+1. **Discovery** — `POST /api/marketing/discover` returns success without calling Hermes `marketing-researcher`
+2. **X Ads** — `POST /api/x/boost` inserts `boost_campaigns` row only; no X Ads API
+3. **Reply poll** — `POST /api/conversations/poll` marks stale threads only; no platform inbox/API polling
 
 ---
 
 ## For Sales vertical
 
-The tab system is ready. Sales tab currently shows "Coming Soon" placeholder. To build it:
-
-1. Create a `SalesPanel.tsx` (same pattern as `MarketingPanel.tsx`)
-2. Add your tab content inside the `{tab === "sales" && ...}` block in `Dashboard.tsx`
-3. The `CampaignTab` type in `marketingTypes.ts` already includes `"sales"`
-4. CampaignTabs component already has the Sales tab (currently disabled) — flip `disabled` to `false` when ready
+Sales tab shows "Coming Soon". Sales can use its own tables (e.g. `conversations`, `conversation_messages`) without conflicting with marketing's renamed tables.

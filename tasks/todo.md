@@ -13,6 +13,7 @@
 ## Review / findings
 - `delegate_task` is background-only on this install; Results only return inside a persistent process → manager sessions MUST run via gateway api_server (`X-Hermes-Session-Id`), which is the production path anyway.
 - Reviewer checklist is genuinely strict (caught gmail-vs-corporate recipient mismatch unprompted).
+- 2026-07-18: Sales research/implementation contract is documented in `docs/sales/`; its merge → `feature/sales` execution plan lives in Cursor plan `sales-vertical`.
 
 ## Blocked on provisioning (ping user)
 - [ ] **AgentMail key** → real send (agentmail.to, free tier)
@@ -20,3 +21,14 @@
 
 ## Next sprints (per PLAN.md)
 - [ ] Convex swap-in for state/campaign.json; Strategist + Loop 0 dossier; LiteLLM+Langfuse; frontend per DESIGN.md; X content; evals; infra/domain
+
+## Sales vertical (`feature/sales`) — 2026-07-18
+- [x] Merge Marketing into base + persistence/policy fixes (`003_marketing.sql`, sessionDbId, kill switch, scoped CRM)
+- [x] Sales docs contract in `docs/sales/`
+- [x] Foundation: types, `004_sales.sql`, setup/plan APIs, Sales tab UI, agents/skills
+- [x] Discovery: Linkup provenance, scores, target review
+- [x] Execution: sequences, reviewer, AgentMail send gate + receipts
+- [x] Ops: pipeline, inbox, conversations, meetings, tasks
+- [x] Evals: `web/evals/sales` (15 pass) + verification checklist
+- [ ] **User:** apply Supabase migrations 003+004; verify controlled real email→calendar with live keys
+
