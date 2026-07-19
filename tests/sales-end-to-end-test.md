@@ -103,55 +103,32 @@ You are **Cal.com’s Head of Growth** running outbound through Kami.
 
 ---
 
-## Phase 1 — Sales setup
+## Phase 1 — Run outbound + confirm (NL setup)
 
 ### Steps
 
-1. Click tab **Sales**
-2. If you see **Set up Sales**, fill the form exactly as below
-3. Click **Launch Sales**
-
-### Test data to enter
-
-| Field | Value |
-|-------|--------|
-| **Offer / value prop** | `Cal.com helps revenue teams book more qualified meetings with embeddable scheduling, routing, and team workflows — without back-and-forth email.` |
-| **Titles** | `VP Sales, Head of Revenue, Director of Sales Operations` |
-| **Industries** | `B2B SaaS, developer tools, fintech` |
-| **Company size** | `50-500` |
-| **Geography** | `US, UK` |
-| **Exclusions** | `cal.com` (one line) |
-| **Deal min ($)** | `5000` |
-| **Deal max ($)** | `50000` |
-| **Target accounts** | `15` (keep small for faster discovery) |
-| **Daily send cap** | `5` |
-| **Channels** | **Email** only (leave X unchecked for first test) |
-| **Approved claims** | One per line: `Open-source scheduling infrastructure` / `Used by thousands of teams for inbound and outbound booking` / `No back-and-forth email to find a time` |
-| **Sender name** | Your real name |
-| **Sender email** | Your AgentMail-connected address (e.g. same domain as `AGENTMAIL_INBOX`) |
-| **Auto follow-ups** | ✓ On |
-| **Require approval before first send** | **Uncheck for first E2E send test** (see note below) |
-
-**Note on “Require approval before first send”:** When checked, the server expects a `sales_approvals` row with scope `first_send` before the first AgentMail send. There is **no UI for that yet**—either uncheck this for testing, or insert the approval in Supabase (see Phase 5 appendix).
+1. On **Overview**, click **Run outbound** (or open tab **Sales**)
+2. You should see **Confirm who and what** with three prefilled blocks from the cal.com dossier
+3. Edit if needed; pick **15** companies; optionally open **Edit details** or **Advanced**
+4. Click **Looks good — show plan**
 
 ### Expected behavior
 
 | What you see | Why |
 |--------------|-----|
-| Form disappears; **Sales Operations** header with kill switch | Config saved to `sales_campaigns` |
-| **Sales Plan v1** card with status **DRAFT** | Local strategist scaffold generated plan |
-| Motions include **signal_outreach** / email | Matches your channel selection |
-| Three **Tier** boxes with account counts | Derived from target quantity (15) |
-| Risks / prerequisites listed | SPF/DKIM, suppression, etc. |
-| Ops tabs: Targets, Pipeline, Drafts, Inbox, Meetings, Tasks | Sales panel loaded |
+| Full-width NL textareas (not a narrow jargon form) | Founder UX |
+| Intro: *“We filled this from your company research…”* | Dossier prefill |
+| **Your outbound plan** card with plain-English motions | Plan scaffold |
+| Stepper: Confirm → Plan → Find → Emails → Needs you | Guided path |
+| No six equal ops tabs on first run | Progressive disclosure |
 
 ### If something goes wrong
 
 | Symptom | Fix |
 |---------|-----|
 | “Waiting for session — launch a campaign first” | Complete Phase 0 |
-| Plan says “No plan yet” | Check Network tab: `POST /api/sales/setup` and `POST /api/sales/plan` should be 200 |
-| 500 on setup | Supabase migration `004_sales.sql` not applied |
+| Blank NL fields | Dossier missing — wait for Overview dossier or re-launch |
+| Plan says “Building your plan…” | Check `POST /api/sales/setup` and `POST /api/sales/plan` in Network tab |
 
 ---
 
@@ -159,24 +136,77 @@ You are **Cal.com’s Head of Growth** running outbound through Kami.
 
 ### Steps
 
-1. Read the **Sales Plan v1** card
-2. (Optional) Enter revise note: `Focus Tier 1 on US B2B SaaS with recent funding or sales hiring signals only` → click **Generate revision** → new version appears
+1. Read **Your outbound plan**
+2. (Optional) Revise note → **Regenerate with note**
 3. Click **Approve plan**
 
 ### Expected behavior
 
 | What you see | Why |
 |--------------|-----|
-| Plan status changes to **APPROVED** (red/mono label) | `sales_plans.status = approved` |
-| **Approve plan** button disappears | Draft actions hidden |
-| **Targets** tab: **Target Review** unlocks | Discovery gated on approved plan |
-| Message if you haven’t approved: *“Approve the sales plan to unlock…”* | Correct gating |
+| Status **Approved** | `sales_plans.status = approved` |
+| Stepper advances to **Find** | Plan gate cleared |
+| **Find companies** primary CTA (not auto-discovery) | Explicit find |
 
 ---
 
-## Phase 3 — Discover and review targets
+## Phase 3 — Find companies, add emails, continue
 
 ### Steps
+
+1. Click **Find companies** (wait for Linkup discovery)
+2. Check **Include** on 2–3 accounts
+3. For each included account without email: enter **Add contact email** → **Save** (use **your own email** for test)
+4. Click **Continue with selected**
+
+### Expected behavior
+
+| What you see | Why |
+|--------------|-----|
+| Company cards with Fit / Timing scores and source links | Target review |
+| Inline email field when included | Never invent emails |
+| Sequences created via UI (no console) | `POST /api/sales/sequences` |
+| Stepper moves to **Emails** | Continue wired |
+
+### Old flow (removed)
+
+Do **not** use console `fetch` for sequences or contacts — the UI handles Continue.
+
+---
+
+## Phase 4 — Review and send emails (hybrid)
+
+### Steps
+
+1. On **Review emails**, for each draft: **review** → **approve** → **send** (first 1–3 one-by-one)
+2. If **Approve first send** banner appears, click it once
+3. After 1+ sends, use **Send remaining approved** for batch
+
+### Expected behavior
+
+| What you see | Why |
+|--------------|-----|
+| Draft cards with subject/body preview | Draft queue |
+| Hybrid batch button after individual sends | Trust gate |
+| Stepper moves to **Needs you** after send | `onSent` hook |
+
+---
+
+## Phase 5 — Needs you + More
+
+### Steps
+
+1. Open **Needs you** step — replies/escalations appear when present
+2. After first send, open **More — Pipeline, Inbox, Meetings, Tasks**
+
+---
+
+## Legacy phases (reference)
+
+<details>
+<summary>Older E2E sections before founder UX (collapsed)</summary>
+
+## Phase 1 (old) — Sales setup jargon form
 
 1. Open ops tab **Targets**
 2. Click **Run discovery**

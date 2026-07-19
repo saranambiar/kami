@@ -1,5 +1,19 @@
 # Sales UI and Information Architecture
 
+> Canonical product loops: [docs/product-loops.md](../product-loops.md)
+
+## Founder journey (default)
+
+1. **Overview** — dossier + **Run outbound** CTA  
+2. **Confirm** — NL who / what / how many (prefilled from dossier) + Advanced  
+3. **Plan** — plain-English motions → Approve  
+4. **Find** — explicit Find companies → include + add email → Continue  
+5. **Emails** — review → approve → hybrid send (1–3, then batch)  
+6. **Needs you** — replies, meetings, tasks  
+7. **More** (after first send) — Pipeline, Inbox, Meetings, Tasks  
+
+One Hanko-red primary CTA per step. No six equal ops tabs on first run.
+
 ## Design constraints
 
 Follow `DESIGN.md`: cream paper, black ink, Hanko-red primary action, kraft cards, moss success states, sharp edges, crease dividers, Domine/Source Sans 3/Space Mono hierarchy. Preserve the Marketing tab’s desktop operations-desk pattern but make every Sales state visibly evidence- and approval-driven.

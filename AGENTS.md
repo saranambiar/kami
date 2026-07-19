@@ -141,6 +141,18 @@ If something is behind schedule, cut breadth (fewer playbooks/specialists) befor
 
 ---
 
-## 7. Note on additional skills
+## 7. Product UX principles (founder Sales flow)
+
+Canonical loops live in [docs/product-loops.md](docs/product-loops.md). When changing Domain → Overview → Sales:
+
+- **Domain-first:** Overview dossier pre-fills Sales; never default to a blank ICP jargon form.
+- **One job per screen:** one primary Hanko-red CTA; progressive disclosure (Confirm → Plan → Find → Emails → Needs you).
+- **Recommend → confirm → act → escalate:** NL confirm after dossier; explicit Find companies; hybrid send; kill switch always visible.
+- **Never invent emails:** block send until a real contact email exists on the account.
+- Sales consumes Overview dossier only; Marketing tab is a separate vertical.
+
+---
+
+## 8. Note on additional skills
 
 Additional `.cursor` skills will be added by the team for specific reference material and workflows. Treat those as authoritative supplementary instructions alongside this file — read them when present, they are not optional context.

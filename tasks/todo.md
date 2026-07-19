@@ -30,5 +30,5 @@
 - [x] Execution: sequences, reviewer, AgentMail send gate + receipts
 - [x] Ops: pipeline, inbox, conversations, meetings, tasks
 - [x] Evals: `web/evals/sales` (15 pass) + verification checklist
-- [ ] **User:** apply Supabase migrations 003+004; verify controlled real email→calendar with live keys
+- [x] Founder UX plan executed: `docs/product-loops.md`, NL confirm, stepper, Run outbound, hybrid send, Needs you
 
