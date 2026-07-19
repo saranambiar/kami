@@ -35,6 +35,7 @@ export async function GET(request: Request): Promise<Response> {
 
   const accountIds = (accounts ?? []).map((a) => a.id);
   let signals: Record<string, unknown>[] = [];
+  let contacts: Record<string, unknown>[] = [];
 
   if (accountIds.length > 0) {
     const { data: sigData } = await sb
@@ -43,6 +44,13 @@ export async function GET(request: Request): Promise<Response> {
       .in("account_id", accountIds)
       .order("captured_at", { ascending: false });
     signals = sigData ?? [];
+
+    const { data: contactData } = await sb
+      .from("sales_contacts")
+      .select("id, account_id, name, email, email_verification")
+      .in("account_id", accountIds)
+      .eq("session_id", sessionId);
+    contacts = contactData ?? [];
   }
 
   const signalsByAccount: Record<string, AccountSignal[]> = {};
@@ -52,10 +60,23 @@ export async function GET(request: Request): Promise<Response> {
     signalsByAccount[aid].push(s as unknown as AccountSignal);
   }
 
+  const contactByAccount: Record<string, { id: string; name?: string; email?: string }> = {};
+  for (const c of contacts) {
+    const aid = c.account_id as string;
+    if (!contactByAccount[aid] && c.email) {
+      contactByAccount[aid] = {
+        id: c.id as string,
+        name: c.name as string | undefined,
+        email: c.email as string | undefined,
+      };
+    }
+  }
+
   return Response.json({
     accounts: (accounts ?? []).map((a) => ({
       ...rowToAccount(a),
       signals: signalsByAccount[a.id] ?? [],
+      contact: contactByAccount[a.id] ?? null,
     })),
   });
 }
