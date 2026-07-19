@@ -1,5 +1,5 @@
 import { startObservation } from "@langfuse/tracing";
-import { langfuseSpanProcessor } from "@/instrumentation";
+import { langfuseSpanProcessor } from "@/lib/langfuseProcessor";
 
 const ENABLED = Boolean(
   process.env.LANGFUSE_PUBLIC_KEY && process.env.LANGFUSE_SECRET_KEY,
