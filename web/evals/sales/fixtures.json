@@ -1,0 +1,265 @@
+{
+  "briefs": [
+    {
+      "id": "precise_icp",
+      "description": "Specific titles, industries, size, and geo — research-ready brief",
+      "config": {
+        "offer": "Signal-based outbound for revenue teams",
+        "icp": {
+          "titles": ["VP Sales", "Head of Revenue Operations"],
+          "industries": ["B2B SaaS", "FinTech"],
+          "size": "50-500 employees",
+          "geo": "United States"
+        },
+        "geo": "United States",
+        "target_quantity": 40,
+        "daily_send_cap": 25,
+        "approved_claims": ["Teams use Kami to lift qualified meetings without increasing send volume"]
+      },
+      "expect": {
+        "quality": "precise",
+        "actionable": true,
+        "has_blockers": false
+      }
+    },
+    {
+      "id": "overbroad_icp",
+      "description": "Generic titles and no firmographics — needs refinement before discovery",
+      "config": {
+        "offer": "Grow faster",
+        "icp": {
+          "titles": ["CEO", "Founder"],
+          "industries": []
+        },
+        "target_quantity": 100
+      },
+      "expect": {
+        "quality": "overbroad",
+        "actionable": false,
+        "has_blockers": false
+      }
+    },
+    {
+      "id": "conflicting_constraints",
+      "description": "Target volume exceeds realistic cap; geo overlaps exclusions",
+      "config": {
+        "offer": "Enterprise sales automation",
+        "icp": {
+          "titles": ["CRO"],
+          "industries": ["Enterprise Software"],
+          "geo": "United Kingdom"
+        },
+        "geo": "United Kingdom",
+        "exclusions": ["United Kingdom", "EU regulated accounts"],
+        "target_quantity": 500,
+        "daily_send_cap": 5,
+        "autonomy": {
+          "paused": false,
+          "auto_followups": true,
+          "require_first_send_approval": true
+        },
+        "autonomous_paused": true
+      },
+      "expect": {
+        "quality": "conflicting",
+        "actionable": false,
+        "has_blockers": true
+      }
+    }
+  ],
+  "drafts": [
+    {
+      "id": "good_signal_email",
+      "description": "Step-1 opener with signal ref, single CTA, opt-out, approved claim",
+      "input": {
+        "subject": "Acme Corp + Series B funding",
+        "body": "Hi Jordan,\n\nSaw Acme Corp's funding — raised $18M Series B in May 2026.\n\nTeams use Kami to lift qualified meetings without increasing send volume.\n\nWould a 15-minute call this week make sense?\n\n—\nIf this isn't relevant, reply \"unsubscribe\" and I won't follow up.",
+        "cta": "Would a 15-minute call this week make sense?",
+        "sequence_step": 1,
+        "signal_ref": "https://techcrunch.com/acme-series-b",
+        "approved_claims": ["Teams use Kami to lift qualified meetings without increasing send volume"]
+      },
+      "expect": {
+        "approved": true,
+        "failed_criteria": []
+      }
+    },
+    {
+      "id": "too_long",
+      "description": "Body exceeds 150-word reviewer limit",
+      "input": {
+        "subject": "Quick note for Acme",
+        "body": "Hi Jordan,\n\nSaw your recent funding news and wanted to reach out with a longer note that keeps going on about positioning, market context, competitive landscape, team structure, operational priorities, quarterly goals, pipeline hygiene, enablement programs, messaging frameworks, territory design, compensation plans, forecasting cadence, board reporting, customer success handoffs, onboarding velocity, product-led growth motions, partner channels, international expansion, pricing experiments, category creation, analyst relations, customer advisory boards, renewal playbooks, expansion revenue, multi-threading, champion development, mutual action plans, discovery frameworks, demo customization, proof-of-value design, security review timelines, procurement workflows, legal redlines, implementation planning, change management, executive sponsorship, ROI modeling, business case templates, reference calls, case study development, win-loss reviews, competitive battlecards, and additional paragraphs of filler that exist only to push this message well beyond the one-hundred-fifty word reviewer ceiling for cold outbound first touches where brevity and signal clarity matter more than exhaustive context dumps that recipients will never finish reading on mobile devices during short gaps between meetings.\n\nWould a 15-minute call this week make sense?\n\n—\nIf this isn't relevant, reply \"unsubscribe\" and I won't follow up.",
+        "cta": "Would a 15-minute call this week make sense?",
+        "sequence_step": 1,
+        "signal_ref": "https://example.com/signal",
+        "approved_claims": ["Approved claim placeholder"]
+      },
+      "expect": {
+        "approved": false,
+        "failed_criteria_includes": ["length_exceeded"]
+      }
+    },
+    {
+      "id": "missing_cta",
+      "description": "No clear single CTA in body",
+      "input": {
+        "subject": "Acme + hiring signal",
+        "body": "Hi Jordan,\n\nSaw Acme Corp's hiring push for enterprise AEs.\n\nWe help teams with signal-based outbound.\n\n—\nIf this isn't relevant, reply \"unsubscribe\" and I won't follow up.",
+        "cta": "Would a 15-minute call this week make sense?",
+        "sequence_step": 1,
+        "signal_ref": "https://example.com/hiring",
+        "approved_claims": ["We help teams with signal-based outbound"]
+      },
+      "expect": {
+        "approved": false,
+        "failed_criteria_includes": ["cta_count"]
+      }
+    },
+    {
+      "id": "unsafe_percent_claim",
+      "description": "Unverified numeric ROI claim must fail reviewer",
+      "input": {
+        "subject": "ROI for Acme",
+        "body": "Hi Jordan,\n\nSaw Acme Corp's product launch last month.\n\nCustomers see a 45% increase in ROI within 60 days.\n\nWould a 15-minute call this week make sense?\n\n—\nIf this isn't relevant, reply \"unsubscribe\" and I won't follow up.",
+        "cta": "Would a 15-minute call this week make sense?",
+        "sequence_step": 1,
+        "signal_ref": "https://example.com/launch",
+        "approved_claims": ["Approved claim"]
+      },
+      "expect": {
+        "approved": false,
+        "failed_criteria_includes": ["claims_safety"]
+      }
+    },
+    {
+      "id": "missing_subject",
+      "description": "Subject line required",
+      "input": {
+        "subject": "",
+        "body": "Hi Jordan,\n\nSaw Acme Corp's funding round.\n\nWould a 15-minute call this week make sense?\n\n—\nIf this isn't relevant, reply \"unsubscribe\" and I won't follow up.",
+        "cta": "Would a 15-minute call this week make sense?",
+        "sequence_step": 1,
+        "signal_ref": "https://example.com/funding",
+        "approved_claims": ["Approved claim"]
+      },
+      "expect": {
+        "approved": false,
+        "failed_criteria_includes": ["subject_missing"]
+      }
+    }
+  ],
+  "replies": [
+    {
+      "id": "positive_interest",
+      "content": "This sounds good — let's chat next week about how this could help our team.",
+      "expect": {
+        "label": "positive",
+        "escalation_required": false
+      }
+    },
+    {
+      "id": "objection_budget",
+      "content": "We already have a solution in place and budget is locked until next year.",
+      "expect": {
+        "label": "objection",
+        "escalation_required": true
+      }
+    },
+    {
+      "id": "unsubscribe",
+      "content": "Please remove me from your list and unsubscribe me immediately.",
+      "expect": {
+        "label": "unsubscribe",
+        "escalation_required": true
+      }
+    },
+    {
+      "id": "not_now",
+      "content": "Not now — circle back next quarter when we reopen planning.",
+      "expect": {
+        "label": "not_now",
+        "escalation_required": false
+      }
+    },
+    {
+      "id": "meeting_request",
+      "content": "Can we schedule a Zoom call Thursday afternoon to walk through this?",
+      "expect": {
+        "label": "positive",
+        "escalation_required": false
+      }
+    },
+    {
+      "id": "spam_short",
+      "content": "ok",
+      "expect": {
+        "label": "spam_risk",
+        "escalation_required": true
+      }
+    }
+  ],
+  "sequences": [
+    {
+      "id": "signal_backed_sequence",
+      "description": "Three-step sequence built from dated signal should pass reviewer on step 1",
+      "params": {
+        "offer": "signal-based outbound",
+        "claims": [
+          "Teams use Kami to lift qualified meetings without increasing send volume",
+          "Revenue leaders get dated hooks tied to funding, hiring, and launch signals"
+        ],
+        "account": {
+          "name": "Northwind Analytics",
+          "industry": "B2B SaaS",
+          "domain": "northwind.io"
+        },
+        "signals": [
+          {
+            "id": "sig-001",
+            "account_id": "acct-001",
+            "session_id": "sess-fixture",
+            "provider": "linkup",
+            "signal_type": "funding",
+            "detail": "Raised $12M Series A in April 2026",
+            "source_url": "https://news.example.com/northwind-series-a",
+            "observed_at": "2026-04-12T00:00:00.000Z"
+          }
+        ]
+      },
+      "expect": {
+        "step_count": 3,
+        "step1_has_signal_ref": true,
+        "step1_reviewer_approved": true,
+        "all_have_opt_out": true,
+        "max_body_words": 150
+      }
+    }
+  ],
+  "policy_scenarios": [
+    {
+      "id": "pause_blocks_send",
+      "description": "assertCampaignNotPaused / assertSendAllowed must reject when autonomous_paused=true",
+      "manual_check": "POST /api/sales/send with paused campaign → expect 403 'campaign autonomy is paused'",
+      "acceptance_ref": "docs/sales/compliance-and-autonomy.md — Server-side send gate #2"
+    },
+    {
+      "id": "missing_draft_approval",
+      "description": "Send gate rejects when draftApproved=false even if reviewer passed",
+      "manual_check": "Attempt send with touchpoint status=drafted → expect 403 'draft not approved'",
+      "acceptance_ref": "docs/sales/requirements.md — Outreach and review"
+    },
+    {
+      "id": "missing_reviewer",
+      "description": "Send gate rejects when reviewerApproved=false",
+      "manual_check": "Approve draft but leave reviewer_verdict.approved=false → expect 403 'reviewer verdict not approved'",
+      "acceptance_ref": "docs/sales/measurement-and-evals.md — Reviewer must reject unsupported claims"
+    },
+    {
+      "id": "first_send_without_approval",
+      "description": "First outbound requires explicit first_send approval record",
+      "manual_check": "Campaign with require_first_send_approval=true, no sales_approvals row → expect 403 'first send requires explicit user approval'",
+      "acceptance_ref": "docs/sales/compliance-and-autonomy.md — Approval-gated first send"
+    }
+  ]
+}
