@@ -4,4 +4,5 @@
 - [Hermes prerequisites & local status](./hermes-prerequisites.md)
 - [Sales vertical research and plan](./sales-vertical.md)
 - [Hermes setup guide (teammate + agent)](../references/hermes-setup-guide.md)
+- [Marketing vertical](./marketing-vertical.md)
 - Research digest / source notes: `references/research-context.md`

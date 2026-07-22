@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { MarketingConfig, MarketingPlatform, OutreachGoal } from "@/lib/marketingTypes";
 
 interface MarketingSetupProps {
@@ -33,8 +33,30 @@ export default function MarketingSetup({ sessionDbId, existingTone, onComplete }
   const [tone, setTone] = useState<string[]>(existingTone ?? []);
   const [useDossierTone, setUseDossierTone] = useState(Boolean(existingTone?.length));
   const [saving, setSaving] = useState(false);
+  const [xConnected, setXConnected] = useState(false);
+  const [igConnected, setIgConnected] = useState(false);
+  const [xHandle, setXHandle] = useState<string | null>(null);
+  const [igHandle, setIgHandle] = useState<string | null>(null);
+
+  useEffect(() => {
+    const qs = sessionDbId ? `?session_id=${encodeURIComponent(sessionDbId)}` : "";
+    fetch(`/api/accounts${qs}`)
+      .then((r) => r.json())
+      .then((json) => {
+        const accounts = (json.accounts ?? []) as { platform: string; handle: string | null; status: string }[];
+        const x = accounts.find((a) => a.platform === "x" && a.status === "connected");
+        const ig = accounts.find((a) => a.platform === "instagram" && a.status === "connected");
+        setXConnected(Boolean(x));
+        setIgConnected(Boolean(ig));
+        setXHandle(x?.handle ?? null);
+        setIgHandle(ig?.handle ?? null);
+      })
+      .catch(() => {});
+  }, [sessionDbId]);
 
   function togglePlatform(p: MarketingPlatform) {
+    if (p === "x" && !xConnected) return;
+    if (p === "instagram" && !igConnected) return;
     setPlatforms((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
   }
 
@@ -91,30 +113,48 @@ export default function MarketingSetup({ sessionDbId, existingTone, onComplete }
         </p>
       )}
 
+      <p className="label-caps" style={{ marginBottom: "var(--stack-sm)" }}>Connected accounts</p>
+      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "var(--stack-md)" }}>
+        <span className="mono" style={{ fontSize: 12, color: xConnected ? "var(--moss)" : "var(--hanko)" }}>
+          {xConnected ? `✓ X ${xHandle}` : "✗ X not connected — Log in with X on the landing page"}
+        </span>
+        <span className="mono" style={{ fontSize: 12, color: igConnected ? "var(--moss)" : "var(--hanko)" }}>
+          {igConnected ? `✓ Instagram ${igHandle}` : "✗ Instagram not connected — Log in with Instagram on the landing page"}
+        </span>
+      </div>
+
       <p className="label-caps" style={{ marginBottom: "var(--stack-sm)" }}>Select platforms</p>
       <div style={{ display: "flex", gap: "var(--stack-md)", marginBottom: "var(--stack-lg)" }}>
-        {PLATFORM_INFO.map((p) => (
-          <button
-            key={p.key}
-            type="button"
-            className="kraft-card"
-            onClick={() => togglePlatform(p.key)}
-            style={{
-              flex: 1,
-              cursor: "pointer",
-              border: platforms.includes(p.key) ? "2px solid var(--hanko)" : "1px solid var(--ink)",
-              textAlign: "left",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <strong style={{ fontFamily: "var(--font-headline)" }}>{p.name}</strong>
-              <span style={{ color: platforms.includes(p.key) ? "var(--hanko)" : "var(--outline)", fontWeight: 700 }}>
-                {platforms.includes(p.key) ? "✓" : "·"}
-              </span>
-            </div>
-            <p style={{ fontSize: 13, color: "var(--ink-soft)", marginTop: "0.4rem" }}>{p.blurb}</p>
-          </button>
-        ))}
+        {PLATFORM_INFO.map((p) => {
+          const locked = (p.key === "x" && !xConnected) || (p.key === "instagram" && !igConnected);
+          const selected = platforms.includes(p.key);
+          return (
+            <button
+              key={p.key}
+              type="button"
+              className="kraft-card"
+              onClick={() => togglePlatform(p.key)}
+              disabled={locked}
+              style={{
+                flex: 1,
+                cursor: locked ? "not-allowed" : "pointer",
+                opacity: locked ? 0.55 : 1,
+                border: selected ? "2px solid var(--hanko)" : "1px solid var(--ink)",
+                textAlign: "left",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <strong style={{ fontFamily: "var(--font-headline)" }}>{p.name}</strong>
+                <span style={{ color: selected ? "var(--hanko)" : "var(--outline)", fontWeight: 700 }}>
+                  {locked ? "🔒" : selected ? "✓" : "·"}
+                </span>
+              </div>
+              <p style={{ fontSize: 13, color: "var(--ink-soft)", marginTop: "0.4rem" }}>
+                {locked ? `Connect ${p.name} first, then select.` : p.blurb}
+              </p>
+            </button>
+          );
+        })}
       </div>
 
       {hasX && (

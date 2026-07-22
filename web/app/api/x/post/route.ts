@@ -1,16 +1,26 @@
 import { postTweet } from "@/lib/x";
 import { resolveXAccess } from "@/lib/xCreds";
 import { supabaseServer } from "@/lib/supabase";
+import { readClaimId } from "@/lib/claimCookie";
 
 export async function POST(request: Request): Promise<Response> {
-  const access = await resolveXAccess();
+  const body = await request.json();
+  const { text, sessionDbId, opportunityId } = body as {
+    text?: string;
+    sessionDbId?: string;
+    opportunityId?: string;
+  };
+
+  const access = await resolveXAccess({
+    sessionId: sessionDbId ?? null,
+    claimId: readClaimId(request),
+  });
   if (!access) {
     return Response.json(
-      { error: "No X account connected — log in with X from the dashboard" },
+      { error: "No X account connected for this session — log in with X from the landing page" },
       { status: 503 },
     );
   }
-  const { text, sessionDbId, opportunityId } = await request.json();
   if (!text) return Response.json({ error: "text required" }, { status: 400 });
 
   try {
