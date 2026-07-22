@@ -127,7 +127,6 @@ export default function Dashboard({
 
       {tab === "marketing" && (
         <MarketingPanel
-          sessionId={sessionId}
           sessionDbId={sessionDbId}
           config={marketingConfig}
           dossierTone={dossier?.tone}

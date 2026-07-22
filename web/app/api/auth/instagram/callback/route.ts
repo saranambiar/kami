@@ -1,64 +1,62 @@
-import { exchangeCode } from "@/lib/xOauth";
+import { exchangeIgCode, fetchIgProfile } from "@/lib/igOauth";
 import { supabaseServer } from "@/lib/supabase";
 import { claimCookieHeader, newClaimId, readClaimId } from "@/lib/claimCookie";
 
-// OAuth 2.0 callback: exchange code → tokens, fetch handle, store account for this browser claim.
 export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const cookie = request.headers.get("cookie") ?? "";
-  const stored = cookie.match(/x_oauth=([^;]+)/)?.[1];
-  const [storedState, verifier] = stored?.split(".") ?? [];
+  const storedState = cookie.match(/ig_oauth=([^;]+)/)?.[1];
 
   function fail(reason: string): Response {
     return new Response(null, {
       status: 307,
-      headers: { Location: `/?x_connect=error&reason=${encodeURIComponent(reason)}` },
+      headers: {
+        Location: `/?ig_connect=error&reason=${encodeURIComponent(reason)}`,
+        "Set-Cookie": "ig_oauth=; Path=/; Max-Age=0",
+      },
     });
   }
 
-  if (!code || !state || !verifier || state !== storedState) {
+  const cleanCode = code?.replace(/#_$/, "") ?? null;
+  if (!cleanCode || !state || !storedState || state !== storedState) {
     return fail("invalid oauth state");
   }
 
   try {
-    const tokens = await exchangeCode(code, verifier);
-
-    const meRes = await fetch("https://api.x.com/2/users/me", {
-      headers: { Authorization: `Bearer ${tokens.access_token}` },
-    });
-    const me = await meRes.json().catch(() => ({}));
-    const username: string | undefined = me.data?.username;
-    if (!meRes.ok || !username) return fail("could not fetch X profile");
-
+    const tokens = await exchangeIgCode(cleanCode);
+    const profile = await fetchIgProfile(tokens.access_token);
+    const handle = `@${profile.username}`;
     const claimId = readClaimId(request) ?? newClaimId();
-    const handle = `@${username}`;
 
     const sb = supabaseServer();
     if (sb) {
       const { data: existing } = await sb
         .from("connected_accounts")
-        .select("id, session_id")
-        .eq("platform", "x")
+        .select("id")
+        .eq("platform", "instagram")
         .eq("claim_id", claimId)
         .maybeSingle();
+
+      const oauth = {
+        oauth2: {
+          ...tokens,
+          user_id: tokens.user_id ?? profile.id,
+        },
+      };
 
       if (existing) {
         await sb
           .from("connected_accounts")
-          .update({
-            handle,
-            status: "connected",
-            oauth: { oauth2: tokens },
-          })
+          .update({ handle, status: "connected", oauth })
           .eq("id", existing.id);
       } else {
         await sb.from("connected_accounts").insert({
-          platform: "x",
+          platform: "instagram",
           handle,
           status: "connected",
-          oauth: { oauth2: tokens },
+          oauth,
           claim_id: claimId,
           session_id: null,
         });
@@ -66,9 +64,9 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     const headers = new Headers({
-      Location: `/?x_connect=ok&handle=${encodeURIComponent(handle)}`,
+      Location: `/?ig_connect=ok&handle=${encodeURIComponent(handle)}`,
     });
-    headers.append("Set-Cookie", "x_oauth=; Path=/; Max-Age=0");
+    headers.append("Set-Cookie", "ig_oauth=; Path=/; Max-Age=0");
     headers.append("Set-Cookie", claimCookieHeader(claimId));
 
     return new Response(null, { status: 307, headers });
