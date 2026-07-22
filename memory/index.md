@@ -7,4 +7,5 @@
 - [Sales pipeline overhaul (segments + verified discovery)](./sales-pipeline-overhaul.md)
 - [Domain-truth pipeline (exact domain → Overview → Sales)](./domain-truth.md)
 - [Hermes setup guide (teammate + agent)](../references/hermes-setup-guide.md)
+- [Marketing vertical](./marketing-vertical.md)
 - Research digest / source notes: `references/research-context.md`

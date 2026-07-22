@@ -10,7 +10,8 @@ const REDIRECT_URI =
 
 const AUTH_URL = "https://x.com/i/oauth2/authorize";
 const TOKEN_URL = "https://api.x.com/2/oauth2/token";
-export const SCOPES = "tweet.read tweet.write users.read offline.access";
+// dm.read/dm.write needed for cold DMs when the X project has DM access.
+export const SCOPES = "tweet.read tweet.write users.read offline.access dm.read dm.write";
 
 export function oauthConfigured(): boolean {
   return Boolean(CLIENT_ID && CLIENT_SECRET);
@@ -84,25 +85,41 @@ function refreshToken(refresh: string): Promise<TokenSet> {
   );
 }
 
+export interface TokenLookup {
+  /** Preferred: campaign session UUID */
+  sessionId?: string | null;
+  /** Pre-launch browser claim cookie */
+  claimId?: string | null;
+}
+
 /**
- * Get a valid access token for the connected X account, refreshing (and
- * persisting the new token) if expired. Returns null if no account connected.
+ * Session-scoped X token. Requires sessionId or claimId — never "latest global".
  */
-export async function getValidAccessToken(): Promise<{ token: string; handle: string } | null> {
+export async function getValidAccessToken(
+  lookup: TokenLookup,
+): Promise<{ token: string; handle: string } | null> {
   const sb = supabaseServer();
   if (!sb) return null;
-  const { data } = await sb
+  if (!lookup.sessionId && !lookup.claimId) return null;
+
+  let query = sb
     .from("connected_accounts")
     .select("id, handle, oauth")
     .eq("platform", "x")
     .eq("status", "connected")
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
+
+  if (lookup.sessionId) {
+    query = query.eq("session_id", lookup.sessionId);
+  } else if (lookup.claimId) {
+    query = query.eq("claim_id", lookup.claimId);
+  }
+
+  const { data } = await query.maybeSingle();
   const tokens = (data?.oauth as { oauth2?: TokenSet } | null)?.oauth2;
   if (!data || !tokens?.access_token) return null;
 
-  // still valid (60s buffer)
   if (tokens.expires_at > Date.now() + 60_000) {
     return { token: tokens.access_token, handle: data.handle ?? "" };
   }

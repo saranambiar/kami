@@ -1,5 +1,12 @@
 import { supabaseServer } from "@/lib/supabase";
+import { claimAccountsForSession } from "@/lib/claimAccounts";
+import { readClaimId } from "@/lib/claimCookie";
 
+<<<<<<< HEAD
+=======
+// Create a session row. Returns { id } or { id: null } when Supabase is unconfigured.
+// Claims any connected X/IG accounts for this browser (kami_claim cookie).
+>>>>>>> d81f9ce655114250410211e9744f54349fd695a4
 export async function POST(request: Request): Promise<Response> {
   const sb = supabaseServer();
   if (!sb) return Response.json({ id: null, persisted: false });
@@ -34,5 +41,9 @@ export async function POST(request: Request): Promise<Response> {
   const { data, error } = await sb.from("agent_sessions").insert(row).select("id").single();
 
   if (error) return Response.json({ error: error.message }, { status: 500 });
-  return Response.json({ id: data.id, persisted: true });
+
+  const claimId = readClaimId(request);
+  const claimed = await claimAccountsForSession(sb, data.id, claimId);
+
+  return Response.json({ id: data.id, persisted: true, accounts_claimed: claimed });
 }

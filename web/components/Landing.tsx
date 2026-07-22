@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import GoalChips from "@/components/GoalChips";
-import ConnectX from "@/components/ConnectX";
+import ConnectSocials from "@/components/ConnectSocials";
 
 export interface LaunchParams {
   domain: string;
@@ -138,7 +138,7 @@ export default function Landing({
         />
 
         <div style={{ marginTop: "var(--stack-sm)" }}>
-          <ConnectX />
+          <ConnectSocials />
         </div>
       </section>
 
