@@ -100,7 +100,7 @@ export async function POST(request: Request): Promise<Response> {
       domain: acc.domain,
       industry: acc.industry ?? null,
       geo: acc.geo ?? null,
-      pipeline_stage: "ready_for_approval",
+      pipeline_stage: "researching",
       tier: acc.tier,
       notes: acc.notes ?? null,
       updated_at: new Date().toISOString(),
@@ -172,7 +172,7 @@ export async function POST(request: Request): Promise<Response> {
       name: acc.name,
       domain: acc.domain,
       tier: acc.tier,
-      pipeline_stage: "ready_for_approval",
+      pipeline_stage: "researching",
       signal_count: acc.signals.length,
     });
   }

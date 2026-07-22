@@ -11,6 +11,47 @@ export interface SalesNlPrefill {
   offer: string;
 }
 
+const INDUSTRY_HINTS = [
+  "SaaS",
+  "B2B",
+  "fintech",
+  "developer tools",
+  "devtools",
+  "healthcare",
+  "ecommerce",
+  "e-commerce",
+  "marketplace",
+  "AI",
+  "infrastructure",
+  "security",
+  "HR",
+  "marketing",
+  "sales",
+  "scheduling",
+  "productivity",
+];
+
+function inferIndustriesFromDossier(dossier: Dossier | null): string {
+  const blob = [
+    dossier?.positioning ?? "",
+    dossier?.brand_voice ?? "",
+    ...(dossier?.competitor_analysis?.map((c) => `${c.name} ${c.insight}`) ?? []),
+    ...(dossier?.opportunities?.map((o) => `${o.title} ${o.detail} ${o.playbook}`) ?? []),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  const hits = INDUSTRY_HINTS.filter((h) => blob.includes(h.toLowerCase()));
+  if (hits.length) return [...new Set(hits)].slice(0, 4).join(", ");
+  return "B2B SaaS";
+}
+
+function inferTitlesFromDossier(dossier: Dossier | null): string {
+  const labels = dossier?.icp_buckets?.map((b) => b.label).filter(Boolean) ?? [];
+  if (labels.length) return labels.slice(0, 3).join(", ");
+  return "VP Sales, Head of Growth, Head of Revenue";
+}
+
 export function dossierToNlPrefill(dossier: Dossier | null, domain: string): SalesNlPrefill {
   const bucket = dossier?.icp_buckets?.[0];
   const company = dossier?.company ?? domain.replace(/^www\./, "").split(".")[0];
@@ -23,9 +64,8 @@ export function dossierToNlPrefill(dossier: Dossier | null, domain: string): Sal
     dossier?.positioning ??
     `${company} helps teams with ${dossier?.brand_voice ?? "growth"} — ${dossier?.opportunities?.[0]?.detail ?? "we should lead with the clearest outcome we deliver"}.`;
 
-  const icpTitles = bucket?.label ?? "VP Sales, Head of Growth";
-  const icpIndustries =
-    dossier?.icp_buckets?.map((b) => b.label).filter(Boolean).join(", ") || "SaaS, B2B";
+  const icpTitles = inferTitlesFromDossier(dossier);
+  const icpIndustries = inferIndustriesFromDossier(dossier);
 
   return {
     whoSentence,
@@ -33,7 +73,7 @@ export function dossierToNlPrefill(dossier: Dossier | null, domain: string): Sal
     targetQty: 15,
     icpTitles,
     icpIndustries,
-    geo: "",
+    geo: "US",
     offer: whatSentence.slice(0, 280),
   };
 }
@@ -53,18 +93,19 @@ export function nlPrefillToConfig(
     channels: SalesCampaignConfig["allowed_channels"];
   },
 ): SalesCampaignConfig {
+  const geo = prefill.geo?.trim() || "US";
   const icp: SalesIcp = {
     titles: prefill.icpTitles.split(",").map((s) => s.trim()).filter(Boolean),
     industries: prefill.icpIndustries.split(",").map((s) => s.trim()).filter(Boolean),
     size: "50-500",
-    geo: prefill.geo || undefined,
+    geo,
   };
 
   return {
     session_id: sessionId,
     offer: prefill.offer || prefill.whatSentence.slice(0, 280),
     icp,
-    geo: prefill.geo || undefined,
+    geo,
     exclusions: advanced.exclusions.split("\n").map((s) => s.trim()).filter(Boolean),
     deal_range: {
       min: advanced.dealMin ? Number(advanced.dealMin) : undefined,
@@ -98,7 +139,7 @@ export function configToNlPrefill(config: SalesCampaignConfig): SalesNlPrefill {
     targetQty: config.target_quantity ?? 15,
     icpTitles: titles,
     icpIndustries: industries,
-    geo: config.geo ?? "",
+    geo: config.geo ?? "US",
     offer: config.offer,
   };
 }

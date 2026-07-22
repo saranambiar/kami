@@ -5,6 +5,12 @@ import { fileURLToPath } from "node:url";
 import { classifyReplyContent } from "../../lib/salesClassify";
 import { reviewEmailDraft, type ReviewDraftInput } from "../../lib/salesReview";
 import { buildEmailSequence } from "../../lib/salesSequences";
+import {
+  extractCompanyDomainsFromContent,
+  isDomainBlocked,
+  isListicleTitle,
+} from "../../lib/salesResearch";
+import { synthesizePlanFromConfig } from "../../lib/salesPlan";
 import type { SalesCampaignConfig } from "../../lib/salesTypes";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -236,6 +242,67 @@ function runSequences(fixtures: SequenceFixture[], passed: string[], failed: str
   }
 }
 
+function runResearchAndPlanGates(passed: string[], failed: string[]): void {
+  const errors: string[] = [];
+
+  if (!isDomainBlocked("wellfound.com")) {
+    errors.push("wellfound.com should be blocked");
+  } else {
+    passed.push("research/blocklist_wellfound");
+  }
+
+  if (!isDomainBlocked("underdog.io")) {
+    errors.push("underdog.io should be blocked");
+  } else {
+    passed.push("research/blocklist_underdog");
+  }
+
+  if (!isListicleTitle("Best SaaS Companies to Work for in United Kingdom 2026")) {
+    errors.push("listicle title should be rejected");
+  } else {
+    passed.push("research/listicle_title_reject");
+  }
+
+  if (isListicleTitle("Acme Robotics")) {
+    errors.push("company name should not be treated as listicle");
+  } else {
+    passed.push("research/company_title_ok");
+  }
+
+  const extracted = extractCompanyDomainsFromContent(
+    "Visit https://acme.io/careers and https://wellfound.com/lists/saas for more.",
+    "wellfound.com",
+    "cal.com",
+  );
+  if (!extracted.includes("acme.io") || extracted.includes("wellfound.com")) {
+    errors.push(`content domain extract expected acme.io only, got ${extracted.join(",")}`);
+  } else {
+    passed.push("research/extract_company_from_content");
+  }
+
+  const plan = synthesizePlanFromConfig(
+    {
+      session_id: "eval",
+      offer: "Cal.com helps revenue teams book more qualified meetings",
+      icp: { titles: ["VP Sales"], industries: ["B2B SaaS"], geo: "US" },
+      allowed_channels: ["email"],
+      target_quantity: 15,
+      daily_send_cap: 5,
+      autonomy: { paused: false, auto_followups: true, require_first_send_approval: true },
+    },
+    "campaign-eval",
+    1,
+  );
+  const planText = `${plan.channel_rationale} ${plan.motions.map((m) => m.rationale).join(" ")}`;
+  if (!planText.includes("Cal.com helps revenue teams")) {
+    errors.push("plan synthesis should include offer substring");
+  } else {
+    passed.push("plan/offer_in_synthesis");
+  }
+
+  for (const e of errors) failed.push(`research_plan_gates: ${e}`);
+}
+
 function printManualPolicyChecks(scenarios: PolicyScenario[]): void {
   console.log("\nManual policy checks (require Supabase + API — not counted in pass/fail):");
   for (const scenario of scenarios) {
@@ -255,6 +322,7 @@ function main(): void {
   runDrafts(fixtures.drafts, passed, failed);
   runReplies(fixtures.replies, passed, failed);
   runSequences(fixtures.sequences, passed, failed);
+  runResearchAndPlanGates(passed, failed);
 
   console.log("Sales eval results");
   console.log("==================");

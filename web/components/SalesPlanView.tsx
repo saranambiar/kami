@@ -7,11 +7,12 @@ import { channelLabel, motionLabel } from "@/lib/salesMotionLabels";
 interface SalesPlanViewProps {
   sessionDbId: string | null;
   plan: SalesPlan | null;
+  offer?: string;
   onApproved: (plan: SalesPlan) => void;
   onRevised: (plan: SalesPlan) => void;
 }
 
-export default function SalesPlanView({ sessionDbId, plan, onApproved, onRevised }: SalesPlanViewProps) {
+export default function SalesPlanView({ sessionDbId, plan, offer, onApproved, onRevised }: SalesPlanViewProps) {
   const [reviseNote, setReviseNote] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -74,6 +75,12 @@ export default function SalesPlanView({ sessionDbId, plan, onApproved, onRevised
       <p className="sales-intro" style={{ marginBottom: "var(--stack-md)" }}>
         Here&apos;s what Kami will do next — research companies that match, draft personalized emails, and pause for your OK before anything sends.
       </p>
+
+      {offer && (
+        <p className="mono" style={{ fontSize: 12, color: "var(--ink-soft)", marginBottom: "var(--stack-sm)" }}>
+          Selling: {offer.slice(0, 200)}{offer.length > 200 ? "…" : ""}
+        </p>
+      )}
 
       <p style={{ marginBottom: "var(--stack-sm)" }}>{plan.channel_rationale}</p>
 

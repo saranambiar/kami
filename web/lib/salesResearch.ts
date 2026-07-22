@@ -45,6 +45,8 @@ export interface ResearchSalesTargetsResult {
   accounts: ResearchedAccount[];
 }
 
+const FIT_FLOOR = 0.2;
+
 const SIGNAL_PATTERNS: { type: string; patterns: RegExp[]; detail: (m: RegExpMatchArray) => string }[] = [
   {
     type: "funding",
@@ -83,9 +85,7 @@ const SIGNAL_PATTERNS: { type: string; patterns: RegExp[]; detail: (m: RegExpMat
   },
   {
     type: "community_activity",
-    patterns: [
-      /\b(tweeted|posted on x|linkedin post|blog post|announced on)\b/i,
-    ],
+    patterns: [/\b(tweeted|posted on x|linkedin post|blog post|announced on)\b/i],
     detail: () => "Public community or content activity",
   },
 ];
@@ -97,50 +97,132 @@ const DATE_PATTERN = new RegExp(
   "i",
 );
 
+const LISTICLE_TITLE =
+  /\b(best|top)\s+\d*\s*(saas|b2b|startup|companies|firms|agencies|platforms|tools)\b|\bto work for\b|\brecruiting firms\b|\bbest agencies\b|\blist of\b|\bcompanies like\b/i;
+
+const PUBLISHER_BLOCKLIST = [
+  "linkedin.com",
+  "twitter.com",
+  "x.com",
+  "facebook.com",
+  "instagram.com",
+  "youtube.com",
+  "crunchbase.com",
+  "techcrunch.com",
+  "bloomberg.com",
+  "reuters.com",
+  "wikipedia.org",
+  "google.com",
+  "github.com",
+  "wellfound.com",
+  "angel.co",
+  "underdog.io",
+  "gogloby.com",
+  "medium.com",
+  "substack.com",
+  "forbes.com",
+  "businessinsider.com",
+  "producthunt.com",
+  "glassdoor.com",
+  "indeed.com",
+  "builtin.com",
+  "ycombinator.com",
+  "news.ycombinator.com",
+  "reddit.com",
+  "quora.com",
+  "notion.site",
+  "notion.so",
+  "wordpress.com",
+  "blogspot.com",
+  "ghost.io",
+  "beehiiv.com",
+  "axios.com",
+  "theverge.com",
+  "wired.com",
+  "zdnet.com",
+  "cnet.com",
+  "g2.com",
+  "capterra.com",
+  "getapp.com",
+];
+
+/** Exported for evals */
+export function isDomainBlocked(host: string): boolean {
+  const h = host.toLowerCase().replace(/^www\./, "");
+  return PUBLISHER_BLOCKLIST.some((b) => h === b || h.endsWith(`.${b}`));
+}
+
+/** Exported for evals */
+export function isListicleTitle(title: string): boolean {
+  return LISTICLE_TITLE.test(title.trim());
+}
+
 function normalizeDomain(raw: string): string | null {
   try {
     const withProto = raw.includes("://") ? raw : `https://${raw}`;
     const host = new URL(withProto).hostname.toLowerCase().replace(/^www\./, "");
-    if (!host.includes(".") || domainBlocklist(host)) return null;
+    if (!host.includes(".") || isDomainBlocked(host)) return null;
     return host;
   } catch {
     const cleaned = raw.trim().toLowerCase().replace(/^www\./, "");
-    if (cleaned.includes(".") && !cleaned.includes(" ")) return cleaned;
+    if (cleaned.includes(".") && !cleaned.includes(" ") && !isDomainBlocked(cleaned)) return cleaned;
     return null;
   }
 }
 
-function domainBlocklist(host: string): boolean {
-  const blocked = [
-    "linkedin.com",
-    "twitter.com",
-    "x.com",
-    "facebook.com",
-    "instagram.com",
-    "youtube.com",
-    "crunchbase.com",
-    "techcrunch.com",
-    "bloomberg.com",
-    "reuters.com",
-    "wikipedia.org",
-    "google.com",
-    "github.com",
-  ];
-  return blocked.some((b) => host === b || host.endsWith(`.${b}`));
+function extractDomainFromUrl(url: string): string | null {
+  try {
+    const withProto = url.includes("://") ? url : `https://${url}`;
+    const host = new URL(withProto).hostname.toLowerCase().replace(/^www\./, "");
+    if (!host.includes(".")) return null;
+    return host;
+  } catch {
+    return null;
+  }
 }
 
-function extractDomainFromUrl(url: string): string | null {
-  return normalizeDomain(url);
+/**
+ * Prefer company domains mentioned in page content over the publisher host.
+ * Exported for evals.
+ */
+export function extractCompanyDomainsFromContent(
+  content: string,
+  publisherHost: string,
+  offerDomain?: string | null,
+): string[] {
+  const found = new Set<string>();
+  const urlMatches = content.matchAll(/https?:\/\/([a-z0-9.-]+\.[a-z]{2,})(?:[/\s"'<>)]|$)/gi);
+  for (const m of urlMatches) {
+    const host = m[1].toLowerCase().replace(/^www\./, "");
+    if (host === publisherHost) continue;
+    if (offerDomain && host === offerDomain) continue;
+    if (isDomainBlocked(host)) continue;
+    found.add(host);
+  }
+  const bareMatches = content.matchAll(/\b([a-z0-9][a-z0-9-]{1,40}\.(?:com|io|co|ai|dev|app|so|gg))\b/gi);
+  for (const m of bareMatches) {
+    const host = m[1].toLowerCase();
+    if (host === publisherHost) continue;
+    if (offerDomain && host === offerDomain) continue;
+    if (isDomainBlocked(host)) continue;
+    found.add(host);
+  }
+  return [...found];
+}
+
+function companyNameFromDomain(domain: string): string {
+  const base = domain.split(".")[0];
+  return base.charAt(0).toUpperCase() + base.slice(1);
 }
 
 function extractAccountName(resultName: string, domain: string): string {
+  if (isListicleTitle(resultName)) return companyNameFromDomain(domain);
   const cleaned = resultName
     .replace(/\s*[-|–—]\s*.+$/, "")
     .replace(/\s*\|.+\s*$/, "")
     .trim();
-  if (cleaned.length >= 2 && cleaned.length <= 80) return cleaned;
-  const base = domain.split(".")[0];
-  return base.charAt(0).toUpperCase() + base.slice(1);
+  if (cleaned.length >= 2 && cleaned.length <= 60 && !isListicleTitle(cleaned)) return cleaned;
+  return companyNameFromDomain(domain);
 }
 
 function matchesExclusion(name: string, domain: string, exclusions: string[]): boolean {
@@ -194,12 +276,7 @@ function detectSignals(content: string, url: string, capturedAt: string): Resear
 }
 
 function icpKeywords(icp: SalesIcp): string[] {
-  return [
-    ...(icp.industries ?? []),
-    ...(icp.titles ?? []),
-    icp.size ?? "",
-    icp.geo ?? "",
-  ]
+  return [...(icp.industries ?? []), ...(icp.titles ?? []), icp.size ?? "", icp.geo ?? ""]
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
 }
@@ -289,38 +366,56 @@ export async function researchSalesTargets(
   };
 
   const buckets = new Map<string, AccountBucket>();
-  const offerDomain = normalizeDomain(domain);
+  const offerDomain = extractDomainFromUrl(domain.includes("://") ? domain : `https://${domain}`);
 
   for (const result of flat) {
     if (!result.url || !result.content) continue;
+    if (isListicleTitle(result.name || "")) continue;
 
-    let accountDomain = extractDomainFromUrl(result.url);
-    if (!accountDomain) continue;
-    if (offerDomain && accountDomain === offerDomain) continue;
+    const publisherHost = extractDomainFromUrl(result.url);
+    if (!publisherHost) continue;
 
-    const accountName = extractAccountName(result.name || "", accountDomain);
-    if (matchesExclusion(accountName, accountDomain, exclusions)) continue;
+    const companyDomains = extractCompanyDomainsFromContent(
+      result.content,
+      publisherHost,
+      offerDomain,
+    );
+
+    // Prefer company domains from content; only use publisher if it is not blocked.
+    let accountDomains: string[] = companyDomains;
+    if (!accountDomains.length) {
+      if (isDomainBlocked(publisherHost)) continue;
+      if (offerDomain && publisherHost === offerDomain) continue;
+      accountDomains = [publisherHost];
+    }
 
     const signals = detectSignals(result.content, result.url, capturedAt);
-    const key = accountDomain;
 
-    const existing = buckets.get(key);
-    if (existing) {
-      existing.contentParts.push(result.content);
-      existing.urls.add(result.url);
-      for (const sig of signals) {
-        if (!existing.signals.some((s) => s.url === sig.url && s.signal_type === sig.signal_type)) {
-          existing.signals.push(sig);
+    for (const accountDomain of accountDomains.slice(0, 3)) {
+      if (offerDomain && accountDomain === offerDomain) continue;
+      if (isDomainBlocked(accountDomain)) continue;
+
+      const accountName = extractAccountName(result.name || "", accountDomain);
+      if (matchesExclusion(accountName, accountDomain, exclusions)) continue;
+
+      const existing = buckets.get(accountDomain);
+      if (existing) {
+        existing.contentParts.push(result.content);
+        existing.urls.add(result.url);
+        for (const sig of signals) {
+          if (!existing.signals.some((s) => s.url === sig.url && s.signal_type === sig.signal_type)) {
+            existing.signals.push(sig);
+          }
         }
+      } else {
+        buckets.set(accountDomain, {
+          name: accountName,
+          domain: accountDomain,
+          contentParts: [result.content],
+          signals: [...signals],
+          urls: new Set([result.url]),
+        });
       }
-    } else {
-      buckets.set(key, {
-        name: accountName,
-        domain: accountDomain,
-        contentParts: [result.content],
-        signals,
-        urls: new Set([result.url]),
-      });
     }
   }
 
@@ -329,6 +424,8 @@ export async function researchSalesTargets(
   for (const bucket of buckets.values()) {
     const combined = bucket.contentParts.join("\n");
     const fit = scoreFit(combined, icp);
+    if (fit < FIT_FLOOR) continue;
+
     const intent = scoreIntent(bucket.signals);
     const contactability = scoreContactability(combined);
     const hasFreshSignal = bucket.signals.some((s) => {
@@ -337,7 +434,7 @@ export async function researchSalesTargets(
       return age <= 60;
     });
 
-    let tier = assignTier(fit, intent, hasFreshSignal);
+    const tier = assignTier(fit, intent, hasFreshSignal);
     const priority = Math.min(1, fit * 0.35 + intent * 0.4 + contactability * 0.25);
 
     const explanation = [

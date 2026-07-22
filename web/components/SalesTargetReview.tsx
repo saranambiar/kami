@@ -28,6 +28,7 @@ interface AccountWithMeta extends SalesAccount {
 interface SalesTargetReviewProps {
   sessionDbId: string | null;
   plan: SalesPlan | null;
+  offer?: string;
   paused?: boolean;
   onContinue?: () => void;
 }
@@ -39,11 +40,18 @@ function isIncluded(account: SalesAccount): boolean {
   return false;
 }
 
-export default function SalesTargetReview({ sessionDbId, plan, paused, onContinue }: SalesTargetReviewProps) {
+export default function SalesTargetReview({
+  sessionDbId,
+  plan,
+  offer,
+  paused,
+  onContinue,
+}: SalesTargetReviewProps) {
   const [accounts, setAccounts] = useState<AccountWithMeta[]>([]);
   const [busy, setBusy] = useState(false);
   const [discoverMsg, setDiscoverMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [emailBanner, setEmailBanner] = useState<string | null>(null);
   const [emailDrafts, setEmailDrafts] = useState<Record<string, string>>({});
   const [savingEmailId, setSavingEmailId] = useState<string | null>(null);
 
@@ -80,6 +88,7 @@ export default function SalesTargetReview({ sessionDbId, plan, paused, onContinu
     if (!sessionDbId || paused) return;
     setBusy(true);
     setError(null);
+    setEmailBanner(null);
     setDiscoverMsg(null);
     try {
       const res = await fetch("/api/sales/discover", {
@@ -92,7 +101,9 @@ export default function SalesTargetReview({ sessionDbId, plan, paused, onContinu
         setError(json.error ?? "Discovery failed");
         return;
       }
-      setDiscoverMsg(`Found ${json.count ?? 0} companies`);
+      setDiscoverMsg(
+        `Found ${json.count ?? 0} companies — check Include on the ones you want, then add emails.`,
+      );
       await fetchAccounts();
     } finally {
       setBusy(false);
@@ -106,13 +117,16 @@ export default function SalesTargetReview({ sessionDbId, plan, paused, onContinu
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ account_id: account.id, included }),
     });
-    if (res.ok) await fetchAccounts();
+    if (res.ok) {
+      setEmailBanner(null);
+      await fetchAccounts();
+    }
   }
 
-  async function saveEmail(account: AccountWithMeta) {
-    if (!sessionDbId || !account.id) return;
+  async function saveEmail(account: AccountWithMeta): Promise<boolean> {
+    if (!sessionDbId || !account.id) return false;
     const email = (emailDrafts[account.id] ?? account.contact?.email ?? "").trim();
-    if (!email.includes("@")) return;
+    if (!email.includes("@")) return false;
 
     setSavingEmailId(account.id);
     setError(null);
@@ -130,9 +144,10 @@ export default function SalesTargetReview({ sessionDbId, plan, paused, onContinu
       const json = await res.json();
       if (!res.ok) {
         setError(json.error ?? "Could not save email");
-        return;
+        return false;
       }
       await fetchAccounts();
+      return true;
     } finally {
       setSavingEmailId(null);
     }
@@ -143,47 +158,66 @@ export default function SalesTargetReview({ sessionDbId, plan, paused, onContinu
     const selected = accounts.filter((a) => a.id && isIncluded(a));
     if (!selected.length) {
       setError("Select at least one company to continue.");
+      setEmailBanner(null);
       return;
     }
 
-    for (const acc of selected) {
-      const draft = emailDrafts[acc.id!]?.trim();
-      if (!acc.contact?.email && draft?.includes("@")) {
-        await saveEmail({ ...acc, contact: undefined });
-      } else if (!acc.contact?.email && !draft?.includes("@")) {
-        setError("Add a contact email for each selected company before continuing.");
-        return;
-      }
+    const missingEmails = selected.filter((a) => {
+      const draft = emailDrafts[a.id!]?.trim();
+      return !a.contact?.email && !draft?.includes("@");
+    });
+    if (missingEmails.length) {
+      setEmailBanner(
+        `${missingEmails.length} of ${selected.length} selected companies need a contact email — add emails or uncheck them.`,
+      );
+      setError(null);
+      return;
     }
 
     setBusy(true);
     setError(null);
+    setEmailBanner(null);
     try {
+      for (const acc of selected) {
+        if (!acc.contact?.email && emailDrafts[acc.id!]?.includes("@")) {
+          const ok = await saveEmail(acc);
+          if (!ok) return;
+        }
+      }
+
       const accRes = await fetch(`/api/sales/accounts?session_id=${sessionDbId}`);
       const accJson = await accRes.json();
       const fresh = (accJson.accounts ?? []) as AccountWithMeta[];
-      const accountIds = fresh.filter((a) => a.id && isIncluded(a)).map((a) => a.id!);
+      const withEmail = fresh.filter((a) => a.id && isIncluded(a) && a.contact?.email);
+      const accountIds = withEmail.map((a) => a.id!);
 
       if (!accountIds.length) {
-        setError("No selected companies found.");
+        setEmailBanner(
+          `${selected.length} of ${selected.length} selected companies need a contact email — add emails or uncheck them.`,
+        );
         return;
       }
 
-      const missing = fresh.filter((a) => a.id && isIncluded(a) && !a.contact?.email);
-      if (missing.length) {
-        setError("Add a contact email for each selected company before continuing.");
+      const stillMissing = fresh.filter((a) => a.id && isIncluded(a) && !a.contact?.email);
+      if (stillMissing.length) {
+        setEmailBanner(
+          `${stillMissing.length} of ${selected.length} selected companies need a contact email — add emails or uncheck them.`,
+        );
         return;
       }
 
-      await Promise.all(
-        accountIds.map((id) =>
-          fetch(`/api/sales/accounts/${id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ pipeline_stage: "sequencing" as PipelineStage, actor: "user" }),
-          }),
-        ),
-      );
+      for (const id of accountIds) {
+        const patchRes = await fetch(`/api/sales/accounts/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pipeline_stage: "sequencing" as PipelineStage, actor: "user" }),
+        });
+        if (!patchRes.ok) {
+          const patchJson = await patchRes.json().catch(() => ({}));
+          setError(patchJson.error ?? `Could not advance account ${id}`);
+          return;
+        }
+      }
 
       const seqRes = await fetch("/api/sales/sequences", {
         method: "POST",
@@ -193,6 +227,18 @@ export default function SalesTargetReview({ sessionDbId, plan, paused, onContinu
       const seqJson = await seqRes.json();
       if (!seqRes.ok) {
         setError(seqJson.error ?? "Could not create email sequences");
+        return;
+      }
+
+      const enrolled = seqJson.enrolled_count ?? 0;
+      if (enrolled === 0) {
+        const skipped = (seqJson.skipped ?? []) as { account_id: string; reason: string }[];
+        const reasons = skipped.map((s) => s.reason).filter(Boolean);
+        setError(
+          reasons.length
+            ? `No drafts created — ${reasons.slice(0, 3).join("; ")}`
+            : "No drafts created — every selected company was skipped.",
+        );
         return;
       }
 
@@ -214,13 +260,17 @@ export default function SalesTargetReview({ sessionDbId, plan, paused, onContinu
     );
   }
 
-  const included = accounts.filter((a) => isIncluded(a));
-  const includedCount = included.length;
+  const includedCount = accounts.filter((a) => isIncluded(a)).length;
 
   return (
     <div className="kraft-card" style={{ padding: "var(--stack-md)", marginTop: "var(--stack-md)" }}>
+      {offer && (
+        <p className="mono" style={{ fontSize: 12, color: "var(--ink-soft)", marginBottom: "var(--stack-sm)" }}>
+          Selling: {offer.slice(0, 160)}{offer.length > 160 ? "…" : ""}
+        </p>
+      )}
       <p className="sales-intro" style={{ marginBottom: "var(--stack-md)" }}>
-        Research companies, pick who to pursue, and add a real email for anyone you want to reach.
+        Research companies, check Include on who to pursue, and add a real email for each one you select.
       </p>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--stack-sm)", flexWrap: "wrap", gap: "var(--stack-sm)" }}>
@@ -250,6 +300,20 @@ export default function SalesTargetReview({ sessionDbId, plan, paused, onContinu
       </div>
       <hr className="crease" />
 
+      {emailBanner && (
+        <div
+          className="kraft-card"
+          style={{
+            padding: "var(--stack-sm)",
+            marginBottom: "var(--stack-sm)",
+            borderColor: "var(--hanko)",
+            background: "var(--kraft)",
+          }}
+        >
+          <p style={{ fontSize: 14 }}>{emailBanner}</p>
+        </div>
+      )}
+
       {error && (
         <p className="mono" style={{ color: "var(--hanko)", fontSize: 13, marginBottom: "var(--stack-sm)" }}>
           {error}
@@ -270,7 +334,6 @@ export default function SalesTargetReview({ sessionDbId, plan, paused, onContinu
           {accounts.map((acc) => {
             const selected = isIncluded(acc);
             const factors = acc.score?.factors;
-            const contactEmail = acc.contact?.email ?? emailDrafts[acc.id ?? ""] ?? "";
 
             return (
               <div

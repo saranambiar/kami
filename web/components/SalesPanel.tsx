@@ -14,10 +14,12 @@ import MeetingQueue from "@/components/MeetingQueue";
 import SalesTaskBoard from "@/components/SalesTaskBoard";
 import KillSwitch from "@/components/KillSwitch";
 
+/** Steps shown after setup is complete (Confirm is full-screen SalesSetup only). */
 export type SalesGuidedStep = "confirm" | "plan" | "find" | "emails" | "needs";
 
-const STEPS: { key: SalesGuidedStep; label: string }[] = [
-  { key: "confirm", label: "Confirm" },
+type OpsStep = "plan" | "find" | "emails" | "needs";
+
+const OPS_STEPS: { key: OpsStep; label: string }[] = [
   { key: "plan", label: "Plan" },
   { key: "find", label: "Find" },
   { key: "emails", label: "Emails" },
@@ -33,8 +35,7 @@ interface SalesPanelProps {
   onSetup: (config: SalesCampaignConfig) => void;
 }
 
-function defaultStep(config: SalesCampaignConfig | null, plan: SalesPlan | null): SalesGuidedStep {
-  if (!config) return "confirm";
+function defaultOpsStep(plan: SalesPlan | null): OpsStep {
   if (!plan || plan.status !== "approved") return "plan";
   return "find";
 }
@@ -51,7 +52,7 @@ export default function SalesPanel({
   const [showSettings, setShowSettings] = useState(false);
   const [paused, setPaused] = useState(config?.autonomous_paused ?? false);
   const [pauseSaving, setPauseSaving] = useState(false);
-  const [step, setStep] = useState<SalesGuidedStep>(() => focusStep ?? defaultStep(config, null));
+  const [step, setStep] = useState<OpsStep>("plan");
   const [showMore, setShowMore] = useState(false);
   const [hasSent, setHasSent] = useState(false);
   const [sequencesCreated, setSequencesCreated] = useState(false);
@@ -63,10 +64,13 @@ export default function SalesPanel({
       .then((j) => {
         const p = j.plan ?? null;
         setPlan(p);
-        if (p?.status === "approved" && step === "plan") setStep("find");
+        setStep((prev) => {
+          if (p?.status === "approved" && prev === "plan") return "find";
+          return prev;
+        });
       })
       .catch(() => {});
-  }, [sessionDbId, step]);
+  }, [sessionDbId]);
 
   useEffect(() => {
     setPaused(config?.autonomous_paused ?? false);
@@ -77,19 +81,37 @@ export default function SalesPanel({
   }, [config, fetchPlan]);
 
   useEffect(() => {
-    if (focusStep) setStep(focusStep);
+    if (!focusStep || focusStep === "confirm") return;
+    setStep(focusStep);
   }, [focusStep]);
 
-  const stepIndex = STEPS.findIndex((s) => s.key === step);
+  useEffect(() => {
+    if (config && !focusStep) {
+      setStep(defaultOpsStep(plan));
+    }
+    // Only re-default when config first appears or plan status flips to approved from null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config?.session_id, plan?.status]);
+
   const planApproved = plan?.status === "approved";
 
-  const unlockedThrough = useMemo(() => {
-    if (!config) return 0;
-    if (!planApproved) return 1;
-    if (!sequencesCreated && step !== "emails" && step !== "needs") return 2;
-    if (!hasSent && step !== "needs") return 3;
-    return 4;
-  }, [config, planApproved, sequencesCreated, hasSent, step]);
+  const stepDone = useMemo(
+    () => ({
+      plan: planApproved,
+      find: sequencesCreated,
+      emails: hasSent,
+      needs: hasSent,
+    }),
+    [planApproved, sequencesCreated, hasSent],
+  );
+
+  function canVisit(key: OpsStep): boolean {
+    if (key === "plan") return true;
+    if (key === "find") return planApproved;
+    if (key === "emails") return planApproved && sequencesCreated;
+    if (key === "needs") return planApproved && (sequencesCreated || hasSent);
+    return false;
+  }
 
   async function handlePauseChange(nextPaused: boolean) {
     if (!sessionDbId) return;
@@ -129,12 +151,6 @@ export default function SalesPanel({
     );
   }
 
-  function goToStep(key: SalesGuidedStep, idx: number) {
-    if (idx <= unlockedThrough || (planApproved && key !== "confirm")) {
-      setStep(key);
-    }
-  }
-
   return (
     <div className="sales-panel">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--stack-sm)" }}>
@@ -145,7 +161,7 @@ export default function SalesPanel({
             className="mono"
             onClick={() => setShowSettings(true)}
             style={{ border: "1px solid var(--ink)", background: "transparent", padding: "0.3rem 0.6rem", cursor: "pointer", fontSize: 12 }}
-            title="Settings"
+            title="Edit who and what"
           >
             ⚙
           </button>
@@ -155,26 +171,32 @@ export default function SalesPanel({
       <hr className="crease" />
 
       <nav className="sales-stepper" aria-label="Sales progress">
-        {STEPS.map((s, idx) => (
-          <button
-            key={s.key}
-            type="button"
-            className="sales-step"
-            data-active={step === s.key}
-            data-done={idx < stepIndex}
-            onClick={() => goToStep(s.key, idx)}
-            disabled={idx > unlockedThrough && s.key !== "confirm"}
-          >
-            {idx < stepIndex ? "✓ " : ""}
-            {s.label}
-          </button>
-        ))}
+        {OPS_STEPS.map((s) => {
+          const done = stepDone[s.key];
+          const active = step === s.key;
+          const unlocked = canVisit(s.key);
+          return (
+            <button
+              key={s.key}
+              type="button"
+              className="sales-step"
+              data-active={active}
+              data-done={done && !active}
+              onClick={() => unlocked && setStep(s.key)}
+              disabled={!unlocked}
+            >
+              {done && !active ? "✓ " : ""}
+              {s.label}
+            </button>
+          );
+        })}
       </nav>
 
       {step === "plan" && (
         <SalesPlanView
           sessionDbId={sessionDbId}
           plan={plan}
+          offer={config.offer}
           onApproved={(p) => {
             setPlan(p);
             setStep("find");
@@ -187,6 +209,7 @@ export default function SalesPanel({
         <SalesTargetReview
           sessionDbId={sessionDbId}
           plan={plan}
+          offer={config.offer}
           paused={paused}
           onContinue={() => {
             setSequencesCreated(true);

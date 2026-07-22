@@ -31,4 +31,9 @@
 - [x] Ops: pipeline, inbox, conversations, meetings, tasks
 - [x] Evals: `web/evals/sales` (15 pass) + verification checklist
 - [x] Founder UX plan executed: `docs/product-loops.md`, NL confirm, stepper, Run outbound, hybrid send, Needs you
+- [x] RCA logged: `docs/sales/founder-ux-rca.md` (RC-1–RC-10 + P0/P1/P2 next steps)
+- [x] **RCA P0:** Confirm chrome fix, opt-in Find inclusion, Continue feedback, publisher domain blocklist
+- [x] **RCA P1:** dossier→config mapping, product-aware plan copy, discovery entity model (company domains from content)
+- [x] **RCA P2:** eval gates for blocklist/listicle/offer; RCA decision log updated
+- [ ] **User:** re-test cal.com path — Find unchecked by default; no wellfound listicles; Continue banner when emails missing
 

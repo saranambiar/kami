@@ -49,5 +49,6 @@ Kami never starts Sales with a blank SDR brief. The Overview dossier pre-fills w
 ## References
 
 - [Sales vertical docs](sales/README.md)
+- [Founder UX RCA & remediation](sales/founder-ux-rca.md) — known gaps between this intent and live Plan/Find behavior
 - [DESIGN.md](../DESIGN.md)
 - [AGENTS.md](../AGENTS.md) — Product UX principles

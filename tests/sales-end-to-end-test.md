@@ -118,9 +118,9 @@ You are **Cal.com’s Head of Growth** running outbound through Kami.
 |--------------|-----|
 | Full-width NL textareas (not a narrow jargon form) | Founder UX |
 | Intro: *“We filled this from your company research…”* | Dossier prefill |
-| **Your outbound plan** card with plain-English motions | Plan scaffold |
-| Stepper: Confirm → Plan → Find → Emails → Needs you | Guided path |
-| No six equal ops tabs on first run | Progressive disclosure |
+| **Your outbound plan** with offer in rationale (“Selling …”) | Product-aware plan |
+| Stepper: Plan → Find → Emails → Needs you (no blank Confirm after setup) | RCA P0 |
+| Re-edit via ⚙ gear | Confirm not a dead step |
 
 ### If something goes wrong
 
@@ -155,22 +155,27 @@ You are **Cal.com’s Head of Growth** running outbound through Kami.
 ### Steps
 
 1. Click **Find companies** (wait for Linkup discovery)
-2. Check **Include** on 2–3 accounts
-3. For each included account without email: enter **Add contact email** → **Save** (use **your own email** for test)
-4. Click **Continue with selected**
+2. Cards should start **unchecked** (opt-in Include)
+3. Check **Include** on 1–2 real **company** domains (not listicle hosts like wellfound.com / underdog.io)
+4. For each included account: enter **Add contact email** → **Save** (use **your own email** for test)
+5. Click **Continue with selected**
 
 ### Expected behavior
 
 | What you see | Why |
 |--------------|-----|
-| Company cards with Fit / Timing scores and source links | Target review |
-| Inline email field when included | Never invent emails |
-| Sequences created via UI (no console) | `POST /api/sales/sequences` |
-| Stepper moves to **Emails** | Continue wired |
+| Company cards with Fit / Timing; default Include off | Opt-in inclusion (`researching` stage) |
+| Offer one-liner at top of Find | Product narrative carry |
+| Banner if Continue without emails | RC-8 feedback |
+| Sequences created; step → Emails only if enrollments &gt; 0 | `enrolled_count` gate |
+| Domains are company sites, not publishers | Blocklist + content domain extract |
 
-### Old flow (removed)
+### Fail signals
 
-Do **not** use console `fetch` for sequences or contacts — the UI handles Continue.
+- Domains like `wellfound.com`, `gogloby.com`, `underdog.io` as “companies”
+- All checkboxes pre-ticked after Find
+- Continue with no banner and no step change when emails missing
+
 
 ---
 
