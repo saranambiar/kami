@@ -2,11 +2,8 @@ import { supabaseServer } from "@/lib/supabase";
 import { claimAccountsForSession } from "@/lib/claimAccounts";
 import { readClaimId } from "@/lib/claimCookie";
 
-<<<<<<< HEAD
-=======
 // Create a session row. Returns { id } or { id: null } when Supabase is unconfigured.
-// Claims any connected X/IG accounts for this browser (kami_claim cookie).
->>>>>>> d81f9ce655114250410211e9744f54349fd695a4
+// Persists domain-truth identity fields when provided; claims connected X/IG accounts (kami_claim cookie).
 export async function POST(request: Request): Promise<Response> {
   const sb = supabaseServer();
   if (!sb) return Response.json({ id: null, persisted: false });
