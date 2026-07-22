@@ -22,6 +22,8 @@ Baseline cold reply rate is ~3.4%. Signal-based emails referencing a funding rou
 - Subject line under 50–60 chars, thesis-fit, no clickbait, no ALL CAPS.
 - Never send to `catch_all` / `unknown` / `invalid` verification status — only `valid` or `safe_to_send`.
 - Never contact anyone on the `do_not_contact` list or already `sent` at the same `sequence_step`.
+- Prefer a **verified public/role inbox** scraped from the company site (or founder-provided email). Never invent an address.
+- Prioritize recipients by **Fit × Intent** (high fit + fresh signal first). Personalize from the dated signal and anything verifiable about the person online — relevance beats clever openers.
 
 ## Follow-up sequencing (real-agency cadence)
 

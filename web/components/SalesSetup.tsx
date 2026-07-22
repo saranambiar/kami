@@ -6,6 +6,7 @@ import {
   configToNlPrefill,
   dossierToNlPrefill,
   nlPrefillToConfig,
+  salesWhoLabel,
   type SalesNlPrefill,
 } from "@/lib/salesDossierPrefill";
 import type { SalesCampaignConfig, SalesChannel } from "@/lib/salesTypes";
@@ -15,6 +16,7 @@ interface SalesSetupProps {
   dossier: Dossier | null;
   domain: string;
   existingConfig?: SalesCampaignConfig | null;
+  goals?: string[];
   onComplete: (config: SalesCampaignConfig, planGenerated: boolean) => void;
 }
 
@@ -25,11 +27,15 @@ export default function SalesSetup({
   dossier,
   domain,
   existingConfig,
+  goals,
   onComplete,
 }: SalesSetupProps) {
   const initial = useMemo(
-    () => (existingConfig ? configToNlPrefill(existingConfig) : dossierToNlPrefill(dossier, domain)),
-    [existingConfig, dossier, domain],
+    () =>
+      existingConfig
+        ? configToNlPrefill(existingConfig)
+        : dossierToNlPrefill(dossier, domain, null, goals),
+    [existingConfig, dossier, domain, goals],
   );
 
   const [whoSentence, setWhoSentence] = useState(initial.whoSentence);
@@ -74,6 +80,7 @@ export default function SalesSetup({
       icpIndustries,
       geo,
       offer: whatSentence.slice(0, 280),
+      positioningLine: whatSentence.slice(0, 140),
     };
 
     const payload = nlPrefillToConfig(sessionDbId, prefill, {
@@ -97,17 +104,8 @@ export default function SalesSetup({
       const json = await res.json();
       const config = (json.config ?? payload) as SalesCampaignConfig;
 
-      let planGenerated = false;
-      if (res.ok) {
-        const planRes = await fetch("/api/sales/plan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session_id: sessionDbId }),
-        });
-        planGenerated = planRes.ok;
-      }
-
-      onComplete(config, planGenerated);
+      // Plan is generated after ICP segments are confirmed (failsafe).
+      onComplete(config, false);
     } catch {
       onComplete(payload, false);
     } finally {
@@ -119,7 +117,7 @@ export default function SalesSetup({
     <div className="sales-panel" style={{ paddingTop: "var(--stack-md)" }}>
       <h3 style={{ marginBottom: "var(--stack-sm)" }}>Confirm who and what</h3>
       <p className="sales-intro">
-        We filled this from your company research. Edit anything that looks wrong, then we&apos;ll show you a plan.
+        We filled this from your company research. Edit anything that looks wrong, then confirm your ICP segments.
       </p>
 
       {!sessionDbId && (
@@ -130,7 +128,7 @@ export default function SalesSetup({
 
       <div className="form-line" style={{ marginBottom: "var(--stack-md)" }}>
         <label className="mono label-caps" htmlFor="who-sentence">
-          Who should we try to book meetings with?
+          {salesWhoLabel(goals)}
         </label>
         <textarea
           id="who-sentence"

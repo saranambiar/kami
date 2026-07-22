@@ -25,6 +25,8 @@ interface DashboardProps {
   connectedChannels: string[];
   marketingConfig: MarketingConfig | null;
   salesConfig: SalesCampaignConfig | null;
+  identityMeta?: { company?: string | null; confidence?: number; evidenceCount?: number } | null;
+  sessionGoals?: string[];
   onConnect: (platform: string) => void;
   onNewCampaign: () => void;
   onApprove: (title: string, playbook: string) => void;
@@ -45,6 +47,8 @@ export default function Dashboard({
   connectedChannels,
   marketingConfig,
   salesConfig,
+  identityMeta,
+  sessionGoals,
   onConnect,
   onNewCampaign,
   onApprove,
@@ -91,6 +95,15 @@ export default function Dashboard({
       {tab === "overview" && (
         <>
           <hr className="crease" />
+          {identityMeta && (
+            <p className="mono" style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: "var(--stack-sm)" }}>
+              Identity: {identityMeta.company ?? domain}
+              {typeof identityMeta.confidence === "number"
+                ? ` · confidence ${(identityMeta.confidence * 100).toFixed(0)}%`
+                : ""}
+              {identityMeta.evidenceCount ? ` · ${identityMeta.evidenceCount} sources` : ""}
+            </p>
+          )}
           {dossier && (
             <div style={{ marginTop: "var(--stack-md)", marginBottom: "var(--stack-sm)" }}>
               <button type="button" className="hanko-btn" onClick={runOutbound}>
@@ -129,7 +142,16 @@ export default function Dashboard({
                 </div>
               )}
 
-              {dossier && <CmoChat sessionId={sessionId} />}
+              {(dossier || sessionDbId) && (
+                <CmoChat
+                  sessionId={sessionId}
+                  domain={domain}
+                  dossier={dossier}
+                  sessionDbId={sessionDbId}
+                  salesConfig={salesConfig}
+                  goals={sessionGoals}
+                />
+              )}
             </div>
 
             {/* RIGHT — intelligence */}
@@ -162,6 +184,7 @@ export default function Dashboard({
           config={salesConfig}
           dossier={dossier}
           domain={domain}
+          goals={sessionGoals}
           focusStep={salesFocusStep}
           onSetup={onSalesSetup}
         />

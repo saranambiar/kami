@@ -88,8 +88,11 @@ Apply the SQL migrations in order in the Supabase SQL editor (or via the CLI):
 2. [`web/supabase/migrations/002_crm.sql`](web/supabase/migrations/002_crm.sql)
 3. [`web/supabase/migrations/003_marketing.sql`](web/supabase/migrations/003_marketing.sql)
 4. [`web/supabase/migrations/004_sales.sql`](web/supabase/migrations/004_sales.sql)
+5. [`web/supabase/migrations/005_connected_accounts_session.sql`](web/supabase/migrations/005_connected_accounts_session.sql) — session-bound X/IG accounts (marketing)
+6. [`web/supabase/migrations/007_sales_segments.sql`](web/supabase/migrations/007_sales_segments.sql) — segments confirm gate + per-account `segment_key`
+7. [`web/supabase/migrations/008_domain_truth.sql`](web/supabase/migrations/008_domain_truth.sql) — canonical domain identity, research snapshot, brand_profiles unique, `sales_discovery_runs`
 
-`003` and `004` are required for the Sales/Marketing verticals to work.
+`003`–`008` are required for Sales/Marketing + ICP confirmation + domain-truth pipeline.
 
 ---
 
@@ -126,23 +129,33 @@ playbook is a `SKILL.md`. Agents live in `agents/`.
 
 ---
 
-## 7. Sales flow (what to click)
+## 7. CMO chat (company context)
 
-Domain → Overview (dossier) → Sales tab. Progressive steps:
+On Overview, **Talk to your CMO** injects a company context pack (from the
+dossier, or from Supabase `brand_profiles.raw_dossier` if the React dossier is
+missing) on **every** turn. Hermes session timeouts no longer wipe company
+knowledge. See [`memory/cmo-context.md`](memory/cmo-context.md).
 
-**Confirm → Plan → Find companies → Emails → Needs you.**
+## 8. Sales flow (what to click)
 
-- **Plan** must be approved before **Find** runs.
-- **Find** researches companies; check **Include**, add a real contact email.
+**Domain validation first:** Landing calls `/api/domain/validate` before any session or Hermes work. Bad/parked domains stay on Landing with a clear error.
+
+Domain → Overview (dossier from **exact-domain** research) → Sales tab. Progressive steps:
+
+**Confirm who/what → Confirm ICP segments → Plan → Find companies → Emails → Needs you.**
+
+- **ICP segments** must be confirmed before Plan/Find (failsafe). B2B segments need editable candidate company domains; PLG segments need personas (no email blast).
+- Changing offer / ICP / geo in setup **clears confirmed segments** — reconfirm before Find.
+- **Plan** uses Hermes sales strategist when available (`web/lib/salesStrategy.ts`); offline scaffold is labeled. Approve before **Find**.
+- **Find** verifies candidate domains, Linkup signal search, public/role emails; scores Fit×Intent (no dated signal → nurture/hold). Runs are traced in `sales_discovery_runs`.
 - Send is **blocked until a real contact email exists** (never invent emails).
+- Resume: Landing offers **Continue {domain} / Start new** — new campaign does not inherit prior Sales state.
 
 Known rough edges are tracked in [docs/sales/founder-ux-rca.md](docs/sales/founder-ux-rca.md).
-Two in-flight redesign plans exist (CMO shared context; Sales pipeline overhaul) —
-ask Sara for the current plan files before starting on those.
-
+See [`memory/domain-truth.md`](memory/domain-truth.md) for the domain-truth pipeline.
 ---
 
-## 8. Evals / checks
+## 9. Evals / checks
 
 ```powershell
 cd web
@@ -152,7 +165,7 @@ npm run build          # type-check + production build
 
 ---
 
-## 9. Branches & deploy (quick reference)
+## 10. Branches & deploy (quick reference)
 
 - Work branch: **`feature/sales`**. Deploy branches: `dev` (Vercel Preview),
   `prod` (Vercel Production).

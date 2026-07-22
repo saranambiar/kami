@@ -1,18 +1,11 @@
 import { supabaseServer } from "@/lib/supabase";
-import { linkupConfigured } from "@/lib/linkup";
-import { researchSalesTargets } from "@/lib/salesResearch";
-import type { SalesIcp } from "@/lib/salesTypes";
+import { researchFromSegments } from "@/lib/salesResearch";
+import type { SalesSegment } from "@/lib/salesSegments";
+import { normalizeSegments } from "@/lib/salesSegments";
 
 export async function POST(request: Request): Promise<Response> {
   const sb = supabaseServer();
   if (!sb) return Response.json({ error: "supabase not configured" }, { status: 503 });
-
-  if (!linkupConfigured()) {
-    return Response.json(
-      { error: "Linkup API not configured — set LINKUP_API_KEY to run sales discovery" },
-      { status: 503 },
-    );
-  }
 
   const { session_id } = await request.json();
   if (!session_id) {
@@ -37,6 +30,16 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
+  if (!campaign.segments_confirmed_at || !Array.isArray(campaign.segments) || !campaign.segments.length) {
+    return Response.json(
+      {
+        error:
+          "ICP segments not confirmed yet — confirm who you're selling to before finding companies",
+      },
+      { status: 400 },
+    );
+  }
+
   const { data: approvedPlan } = await sb
     .from("sales_plans")
     .select("id, status")
@@ -55,32 +58,54 @@ export async function POST(request: Request): Promise<Response> {
 
   const { data: session, error: sessErr } = await sb
     .from("agent_sessions")
-    .select("domain")
+    .select("domain, canonical_domain")
     .eq("id", session_id)
     .maybeSingle();
 
   if (sessErr) return Response.json({ error: sessErr.message }, { status: 500 });
-  if (!session?.domain) {
+  const offerDomain = session?.canonical_domain || session?.domain;
+  if (!offerDomain) {
     return Response.json({ error: "session domain not found" }, { status: 400 });
   }
 
-  let researched;
-  try {
-    researched = await researchSalesTargets({
-      domain: session.domain,
-      icp: campaign.icp as SalesIcp,
-      exclusions: campaign.exclusions ?? [],
-      targetQuantity: campaign.target_quantity ?? 50,
+  const segments = normalizeSegments({ segments: campaign.segments }) as SalesSegment[];
+  const researched = await researchFromSegments({
+    offerDomain,
+    segments,
+    exclusions: campaign.exclusions ?? [],
+  });
+
+  // Traceable discovery run — re-runs attach signals/scores to this id (dedupe below).
+  const { data: runRow, error: runErr } = await sb
+    .from("sales_discovery_runs")
+    .insert({
+      session_id,
+      sales_campaign_id: campaign.id,
+      segment_snapshot: segments,
+      warnings: researched.warnings,
+      accounts_discovered: researched.accounts.length,
+    })
+    .select("id")
+    .single();
+
+  if (runErr) {
+    // Migration 006 may not be applied — continue without run id but surface warning
+    researched.warnings.push(
+      `sales_discovery_runs unavailable — apply 008_domain_truth.sql (${runErr.message})`,
+    );
+  }
+  const discoveryRunId = runRow?.id as string | undefined;
+
+  if (!researched.accounts.length) {
+    return Response.json({
+      discovered: true,
+      count: 0,
+      accounts: [],
+      discovery_run_id: discoveryRunId ?? null,
+      warnings: researched.warnings.length
+        ? researched.warnings
+        : ["No verifiable companies found — refine your segments and try again."],
     });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "discovery failed";
-    if (msg === "LINKUP_NOT_CONFIGURED") {
-      return Response.json(
-        { error: "Linkup API not configured — set LINKUP_API_KEY to run sales discovery" },
-        { status: 503 },
-      );
-    }
-    return Response.json({ error: msg }, { status: 500 });
   }
 
   const created: {
@@ -90,6 +115,8 @@ export async function POST(request: Request): Promise<Response> {
     tier: number;
     pipeline_stage: string;
     signal_count: number;
+    segment_key?: string;
+    email?: string | null;
   }[] = [];
 
   for (const acc of researched.accounts) {
@@ -102,6 +129,7 @@ export async function POST(request: Request): Promise<Response> {
       geo: acc.geo ?? null,
       pipeline_stage: "researching",
       tier: acc.tier,
+      segment_key: acc.segment_key ?? null,
       notes: acc.notes ?? null,
       updated_at: new Date().toISOString(),
     };
@@ -131,30 +159,65 @@ export async function POST(request: Request): Promise<Response> {
 
     const signalIds: string[] = [];
     if (acc.signals.length) {
-      const signalRows = acc.signals.map((sig) => ({
-        session_id,
-        account_id: accountId,
-        provider: sig.provider,
-        signal_type: sig.signal_type,
-        detail: sig.detail,
-        source_url: sig.url,
-        observed_at: sig.observed_at ?? null,
-        captured_at: sig.captured_at,
-        confidence: sig.confidence,
-        evidence_text: sig.evidence_text,
-      }));
-      const { data: insertedSignals, error: sigErr } = await sb
-        .from("sales_account_signals")
-        .insert(signalRows)
-        .select("id");
-      if (sigErr) return Response.json({ error: sigErr.message }, { status: 500 });
-      signalIds.push(...(insertedSignals ?? []).map((s) => s.id));
+      for (const sig of acc.signals) {
+        // Dedupe by account + source_url within session
+        if (sig.url) {
+          const { data: existingSig } = await sb
+            .from("sales_account_signals")
+            .select("id")
+            .eq("account_id", accountId)
+            .eq("source_url", sig.url)
+            .maybeSingle();
+          if (existingSig) {
+            signalIds.push(existingSig.id);
+            if (discoveryRunId) {
+              await sb
+                .from("sales_account_signals")
+                .update({ discovery_run_id: discoveryRunId })
+                .eq("id", existingSig.id);
+            }
+            continue;
+          }
+        }
+
+        const signalRow: Record<string, unknown> = {
+          session_id,
+          account_id: accountId,
+          provider: sig.provider,
+          signal_type: sig.signal_type,
+          detail: sig.detail,
+          source_url: sig.url,
+          observed_at: sig.observed_at ?? null,
+          captured_at: sig.captured_at,
+          confidence: sig.confidence,
+          evidence_text: sig.evidence_text,
+        };
+        if (discoveryRunId) signalRow.discovery_run_id = discoveryRunId;
+
+        const { data: insertedSignal, error: sigErr } = await sb
+          .from("sales_account_signals")
+          .insert(signalRow)
+          .select("id")
+          .single();
+        if (sigErr) return Response.json({ error: sigErr.message }, { status: 500 });
+        if (insertedSignal) signalIds.push(insertedSignal.id);
+      }
     }
 
-    await sb.from("sales_lead_scores").insert({
+    // Upsert latest score for this account (one current row per discover pass — replace prior)
+    const { data: existingScore } = await sb
+      .from("sales_lead_scores")
+      .select("id")
+      .eq("account_id", accountId)
+      .eq("session_id", session_id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const scoreRow: Record<string, unknown> = {
       session_id,
       account_id: accountId,
-      model_version: "v1-heuristic",
+      model_version: "v3-fit-intent-signals",
       factors: {
         fit: acc.score.fit,
         intent: acc.score.intent,
@@ -165,7 +228,52 @@ export async function POST(request: Request): Promise<Response> {
       evidence_refs: signalIds,
       recommended_tier: acc.tier,
       recommended_channel: (campaign.allowed_channels ?? ["email"])[0] ?? "email",
-    });
+    };
+    if (discoveryRunId) scoreRow.discovery_run_id = discoveryRunId;
+
+    if (existingScore) {
+      await sb.from("sales_lead_scores").update(scoreRow).eq("id", existingScore.id);
+    } else {
+      await sb.from("sales_lead_scores").insert(scoreRow);
+    }
+
+    let email: string | null = null;
+    if (acc.contact?.email) {
+      email = acc.contact.email;
+      const verification =
+        acc.contact.verification_status === "role_inbox"
+          ? "safe_to_send"
+          : acc.contact.verification_status === "verified_public" ||
+              acc.contact.verification_status === "hermes_evidence" ||
+              acc.contact.verification_status === "valid"
+            ? "valid"
+            : "unknown";
+
+      const { data: existingContact } = await sb
+        .from("sales_contacts")
+        .select("id")
+        .eq("account_id", accountId)
+        .eq("session_id", session_id)
+        .maybeSingle();
+
+      const contactRow = {
+        session_id,
+        account_id: accountId,
+        sales_campaign_id: campaign.id,
+        name: acc.contact.name ?? acc.name,
+        title: acc.contact.title ?? null,
+        email,
+        email_verification: verification,
+        do_not_contact: false,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (existingContact) {
+        await sb.from("sales_contacts").update(contactRow).eq("id", existingContact.id);
+      } else {
+        await sb.from("sales_contacts").insert(contactRow);
+      }
+    }
 
     created.push({
       id: accountId,
@@ -174,7 +282,16 @@ export async function POST(request: Request): Promise<Response> {
       tier: acc.tier,
       pipeline_stage: "researching",
       signal_count: acc.signals.length,
+      segment_key: acc.segment_key,
+      email,
     });
+  }
+
+  if (discoveryRunId) {
+    await sb
+      .from("sales_discovery_runs")
+      .update({ accounts_discovered: created.length, warnings: researched.warnings })
+      .eq("id", discoveryRunId);
   }
 
   await sb.from("sales_audit_events").insert({
@@ -186,7 +303,9 @@ export async function POST(request: Request): Promise<Response> {
     payload: {
       accounts_discovered: created.length,
       plan_id: approvedPlan.id,
-      source: "linkup",
+      discovery_run_id: discoveryRunId ?? null,
+      source: "segments_verified_signals",
+      warnings: researched.warnings,
     },
   });
 
@@ -194,5 +313,7 @@ export async function POST(request: Request): Promise<Response> {
     discovered: true,
     count: created.length,
     accounts: created,
+    discovery_run_id: discoveryRunId ?? null,
+    warnings: researched.warnings,
   });
 }

@@ -20,6 +20,14 @@ export interface Dossier {
   competitor_analysis: { name: string; insight: string }[];
   icp_buckets: IcpBucket[];
   opportunities: Opportunity[];
+  /** Domain-truth fields */
+  canonical_domain?: string;
+  identity_confidence?: number;
+  evidence_urls?: string[];
+  product_category?: string;
+  industries?: string[];
+  personas?: string[];
+  geos?: string[];
 }
 
 export function newSessionId(): string {
@@ -80,37 +88,39 @@ export async function streamChat(
           onDelta(delta);
         }
       } catch {
-        // partial JSON across chunks — rare with line buffering; skip
+        // partial JSON across chunks
       }
     }
   }
 
-  // Non-SSE fallback: gateway returned a plain JSON completion
   if (!full && buffer.trim().startsWith("{")) {
     try {
       const json = JSON.parse(buffer);
       full = json.choices?.[0]?.message?.content ?? "";
       if (full) onDelta(full);
     } catch {
-      // leave empty; caller shows raw trace
+      /* leave empty */
     }
   }
 
   return full;
 }
 
-/** Extract the last fenced ```json block from agent output. */
-export function parseDossier(text: string): Dossier | null {
+/** Extract the last fenced ```json block from agent output (raw, unvalidated). */
+export function parseDossierRaw(text: string): unknown | null {
   const matches = [...text.matchAll(/```json\s*([\s\S]*?)```/g)];
   const last = matches.at(-1)?.[1];
   if (!last) return null;
   try {
-    const parsed = JSON.parse(last);
-    if (parsed && typeof parsed === "object" && "icp_buckets" in parsed) {
-      return parsed as Dossier;
-    }
-    return null;
+    return JSON.parse(last);
   } catch {
     return null;
   }
+}
+
+/** @deprecated Use parseDossierRaw + validateDossier */
+export function parseDossier(text: string): Dossier | null {
+  const raw = parseDossierRaw(text);
+  if (!raw || typeof raw !== "object" || !("icp_buckets" in (raw as object))) return null;
+  return raw as Dossier;
 }

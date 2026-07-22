@@ -1,7 +1,6 @@
 import { supabaseServer } from "@/lib/supabase";
 import type { Dossier } from "@/lib/hermes";
 
-// GET: load full session state for resume.
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -29,11 +28,17 @@ export async function GET(
 }
 
 interface PatchBody {
-  type: "dossier" | "activity" | "message" | "status" | "opportunity_status";
+  type:
+    | "dossier"
+    | "activity"
+    | "message"
+    | "status"
+    | "opportunity_status"
+    | "research_snapshot"
+    | "domain_check";
   payload: Record<string, unknown>;
 }
 
-// PATCH: persist incremental updates. No-ops (200) when Supabase unconfigured.
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -47,14 +52,29 @@ export async function PATCH(
     switch (type) {
       case "dossier": {
         const d = payload as unknown as Dossier;
-        await sb.from("brand_profiles").insert({
+        const brandRow = {
           session_id: id,
           company: d.company,
           brand_voice: d.brand_voice,
           positioning: d.positioning,
           competitor_analysis: d.competitor_analysis,
           raw_dossier: d,
-        });
+        };
+
+        const { data: existing } = await sb
+          .from("brand_profiles")
+          .select("id")
+          .eq("session_id", id)
+          .maybeSingle();
+
+        if (existing) {
+          await sb.from("brand_profiles").update(brandRow).eq("id", existing.id);
+          await sb.from("icp_buckets").delete().eq("session_id", id);
+          await sb.from("opportunities").delete().eq("session_id", id);
+        } else {
+          await sb.from("brand_profiles").insert(brandRow);
+        }
+
         if (d.icp_buckets?.length) {
           await sb.from("icp_buckets").insert(
             d.icp_buckets.map((b) => ({
@@ -103,6 +123,22 @@ export async function PATCH(
           .update({ status: payload.status, receipt: payload.receipt ?? null })
           .eq("session_id", id)
           .eq("title", payload.title);
+        break;
+      case "research_snapshot":
+        await sb
+          .from("agent_sessions")
+          .update({ research_snapshot: payload })
+          .eq("id", id);
+        break;
+      case "domain_check":
+        await sb
+          .from("agent_sessions")
+          .update({
+            domain_check: payload,
+            canonical_domain: payload.canonical_domain ?? null,
+            domain_validated_at: payload.validated_at ?? new Date().toISOString(),
+          })
+          .eq("id", id);
         break;
     }
     return Response.json({ persisted: true });

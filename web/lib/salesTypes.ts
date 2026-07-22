@@ -97,6 +97,16 @@ export interface SalesIcp {
   geo?: string;
 }
 
+/** Lightweight segment stub on campaign config (full shape in salesSegments.ts). */
+export interface SalesSegmentSummary {
+  key: string;
+  name: string;
+  why_fit: string;
+  motion: "b2b_sales_assisted" | "plg_self_serve";
+  target_persona: string;
+  target_count: number;
+}
+
 export interface DealRange {
   min?: number;
   max?: number;
@@ -127,6 +137,9 @@ export interface SalesCampaignConfig {
   autonomy?: SalesAutonomyPolicy;
   autonomous_paused?: boolean;
   pipeline_stage?: PipelineStage;
+  /** Confirmed outbound segments (failsafe gate before discovery). */
+  segments?: SalesSegmentSummary[] | null;
+  segments_confirmed_at?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -182,6 +195,7 @@ export interface SalesAccount {
   geo?: string;
   pipeline_stage: PipelineStage;
   tier?: 1 | 2 | 3;
+  segment_key?: string;
   notes?: string;
   created_at?: string;
   updated_at?: string;

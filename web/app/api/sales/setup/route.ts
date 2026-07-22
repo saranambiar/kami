@@ -1,11 +1,9 @@
 import { supabaseServer } from "@/lib/supabase";
+import { setupInvalidatesSegments } from "@/lib/salesSetupIntegrity";
 import type {
   SalesCampaignConfig,
   SalesChannel,
   SalesIcp,
-  SalesPlan,
-  SalesPlanMotion,
-  SalesPlanTier,
 } from "@/lib/salesTypes";
 
 function rowToConfig(row: Record<string, unknown>): SalesCampaignConfig {
@@ -30,8 +28,21 @@ function rowToConfig(row: Record<string, unknown>): SalesCampaignConfig {
       require_first_send_approval: row.require_first_send_approval !== false,
     },
     pipeline_stage: row.pipeline_stage as SalesCampaignConfig["pipeline_stage"],
+    segments: (row.segments as SalesCampaignConfig["segments"]) ?? null,
+    segments_confirmed_at: (row.segments_confirmed_at as string | null) ?? null,
     created_at: row.created_at as string | undefined,
     updated_at: row.updated_at as string | undefined,
+  };
+}
+
+function normalizeIcp(icp: unknown): SalesIcp {
+  if (!icp || typeof icp !== "object") return { titles: [], industries: [] };
+  const o = icp as Record<string, unknown>;
+  return {
+    titles: Array.isArray(o.titles) ? o.titles.map(String) : [],
+    industries: Array.isArray(o.industries) ? o.industries.map(String) : [],
+    size: typeof o.size === "string" ? o.size : undefined,
+    geo: typeof o.geo === "string" ? o.geo : undefined,
   };
 }
 
@@ -76,11 +87,24 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: "session_id and offer required" }, { status: 400 });
   }
 
+  const nextIcp = normalizeIcp(icp);
+  const { data: existing } = await sb
+    .from("sales_campaigns")
+    .select("id, offer, icp, geo, segments, segments_confirmed_at")
+    .eq("session_id", session_id)
+    .maybeSingle();
+
+  const invalidate = setupInvalidatesSegments(existing, {
+    offer,
+    icp: nextIcp,
+    geo: geo ?? null,
+  });
+
   const row: Record<string, unknown> = {
     session_id,
     client_id: client_id ?? null,
     offer,
-    icp: icp ?? {},
+    icp: nextIcp,
     geo: geo ?? null,
     exclusions: exclusions ?? null,
     deal_range: deal_range ?? null,
@@ -91,6 +115,11 @@ export async function POST(request: Request): Promise<Response> {
     allowed_channels: allowed_channels ?? ["email"],
     updated_at: new Date().toISOString(),
   };
+
+  if (invalidate) {
+    row.segments = null;
+    row.segments_confirmed_at = null;
+  }
 
   if (autonomy) {
     if (typeof autonomy.paused === "boolean") row.autonomous_paused = autonomy.paused;
@@ -107,7 +136,24 @@ export async function POST(request: Request): Promise<Response> {
     .single();
 
   if (error) return Response.json({ error: error.message }, { status: 500 });
-  return Response.json({ persisted: true, id: data.id, config: rowToConfig(data) });
+
+  if (invalidate) {
+    await sb.from("sales_audit_events").insert({
+      session_id,
+      actor: "system",
+      action: "segments_invalidated",
+      entity_type: "sales_campaign",
+      entity_id: data.id,
+      payload: { reason: "setup_offer_or_icp_changed" },
+    });
+  }
+
+  return Response.json({
+    persisted: true,
+    id: data.id,
+    config: rowToConfig(data),
+    segments_invalidated: invalidate,
+  });
 }
 
 export async function PATCH(request: Request): Promise<Response> {

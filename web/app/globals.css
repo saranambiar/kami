@@ -299,7 +299,12 @@ h3 {
   border: 1px solid var(--outline-variant);
   color: var(--ink-soft);
   background: transparent;
-  cursor: default;
+  cursor: pointer;
+}
+
+.sales-step:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .sales-step[data-active="true"] {
@@ -310,7 +315,11 @@ h3 {
 
 .sales-step[data-done="true"] {
   color: var(--ink);
-  cursor: pointer;
+}
+
+.sales-step[data-blocked="true"] {
+  border-color: var(--hanko);
+  color: var(--hanko);
 }
 
 .sales-disclosure {
@@ -342,4 +351,65 @@ h3 {
   border: 1px solid var(--outline);
   font-family: var(--font-mono);
   font-size: 12px;
+}
+
+/* Find / Hermes busy overlay */
+.sales-busy {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  backdrop-filter: blur(2px);
+  padding: var(--stack-md);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border: 1px solid var(--outline-variant);
+}
+
+.sales-busy-bar {
+  height: 3px;
+  width: 100%;
+  max-width: 280px;
+  margin-bottom: 1rem;
+  background: linear-gradient(
+    90deg,
+    var(--outline-variant) 0%,
+    var(--hanko) 40%,
+    var(--outline-variant) 80%
+  );
+  background-size: 200% 100%;
+  animation: sales-busy-sweep 1.4s linear infinite;
+}
+
+@keyframes sales-busy-sweep {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.sales-busy-stage {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.sales-busy-ticks {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+  font-size: 11px;
+  color: var(--ink-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sales-busy-ticks li[data-active="true"] {
+  color: var(--hanko);
+  font-weight: 600;
 }

@@ -6,6 +6,24 @@ export interface BuildEmailSequenceParams {
   account: { name: string; industry?: string; domain?: string };
   signals: AccountSignal[];
   tone?: string;
+  /** Campaign / session goals — drives CTA wording (never defaults to meetings-only). */
+  goal?: string;
+}
+
+/** Pick a CTA from goal + motion; product-neutral (no hardcoded "book a call"). */
+export function ctaFromGoal(goal?: string): string {
+  const g = (goal ?? "").toLowerCase();
+  if (/\binvestor|vc|fundrais/.test(g)) return "Would a short intro call this week be useful?";
+  if (/\btrial|signup|sign.?up|plg|product.?led|activation/.test(g)) {
+    return "Open to trying a short trial / product walkthrough?";
+  }
+  if (/\bawareness|content|launch|pr\b/.test(g)) {
+    return "Open to a quick collab or quote for a launch note?";
+  }
+  if (/\bdemo|meeting|call|pipeline|outbound|sdr|book/.test(g)) {
+    return "Worth a 15-minute call this week?";
+  }
+  return "Open to a short reply if this is relevant?";
 }
 
 const OPT_OUT_FOOTER =
@@ -48,15 +66,16 @@ function buildOpener(
   signal: AccountSignal | null,
   claim: string | null,
 ): EmailDraft {
-  const { offer, account } = params;
+  const { offer, account, goal } = params;
   const firstName = account.name.split(/\s+/)[0] || "there";
+  const cta = ctaFromGoal(goal);
   const hook = signal
     ? formatSignalHook(signal, account.name)
     : `Noticed ${account.name}${account.industry ? ` in ${account.industry}` : ""} and thought this might be timely.`;
 
   const proof = claim ? ` ${claim}` : "";
   const bodyCore = trimToWordLimit(
-    `Hi ${firstName},\n\n${hook}\n\nWe help teams with ${offer}.${proof}\n\nWould a 15-minute call this week make sense?`,
+    `Hi ${firstName},\n\n${hook}\n\nWe help teams with ${offer}.${proof}\n\n${cta}`,
     130,
   );
   const body = `${bodyCore}${OPT_OUT_FOOTER}`;
@@ -69,7 +88,7 @@ function buildOpener(
   return {
     subject,
     body,
-    cta: "Would a 15-minute call this week make sense?",
+    cta,
     evidence_refs: signal
       ? [signal.id, signal.source_url].filter(Boolean) as string[]
       : [],

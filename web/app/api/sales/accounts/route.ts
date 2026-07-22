@@ -14,6 +14,7 @@ function rowToAccount(row: Record<string, unknown>): SalesAccount {
     geo: row.geo as string | undefined,
     pipeline_stage: row.pipeline_stage as SalesAccount["pipeline_stage"],
     tier: row.tier as SalesAccount["tier"],
+    segment_key: row.segment_key as string | undefined,
     notes: row.notes as string | undefined,
     created_at: row.created_at as string | undefined,
     updated_at: row.updated_at as string | undefined,

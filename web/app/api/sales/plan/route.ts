@@ -1,6 +1,8 @@
 import { supabaseServer } from "@/lib/supabase";
-import { synthesizePlanFromConfig } from "@/lib/salesPlan";
+import { dossierFromBrandPayload } from "@/lib/cmoContext";
+import { generateSalesStrategy } from "@/lib/salesStrategy";
 import type { SalesCampaignConfig, SalesPlan } from "@/lib/salesTypes";
+import type { SalesSegment } from "@/lib/salesSegments";
 
 function rowToPlan(row: Record<string, unknown>): SalesPlan {
   return {
@@ -128,9 +130,54 @@ export async function POST(request: Request): Promise<Response> {
       auto_followups: campaign.auto_followups,
       require_first_send_approval: campaign.require_first_send_approval,
     },
+    segments: campaign.segments ?? null,
+    segments_confirmed_at: campaign.segments_confirmed_at ?? null,
   };
 
-  const synthesized = body.plan ?? synthesizePlanFromConfig(config, campaign.id, nextVersion);
+  const segments = Array.isArray(campaign.segments)
+    ? (campaign.segments as SalesSegment[])
+    : null;
+
+  // Prefer client-supplied plan only when explicitly provided (tests); else Hermes strategist.
+  let synthesized = body.plan as Omit<SalesPlan, "id" | "created_at" | "updated_at"> | undefined;
+  let source: "client" | "hermes" | "offline_fallback" = "client";
+  let note: string | undefined;
+
+  if (!synthesized) {
+    const [session, brand] = await Promise.all([
+      sb
+        .from("agent_sessions")
+        .select("domain, canonical_domain, goals_list, hermes_session_id")
+        .eq("id", session_id)
+        .maybeSingle(),
+      sb.from("brand_profiles").select("*").eq("session_id", session_id).maybeSingle(),
+    ]);
+
+    const domain = (session?.data?.canonical_domain || session?.data?.domain || "") as string;
+    const goalsRaw = session?.data?.goals_list;
+    const goals = Array.isArray(goalsRaw)
+      ? goalsRaw.filter((g): g is string => typeof g === "string")
+      : [];
+    const dossier = dossierFromBrandPayload(brand.data);
+
+    const strategist = await generateSalesStrategy({
+      domain: domain || "unknown",
+      dossier,
+      config,
+      campaignId: campaign.id,
+      version: nextVersion,
+      segments,
+      goals,
+      hermesSessionId:
+        typeof session?.data?.hermes_session_id === "string"
+          ? `kami-sales-plan-${session.data.hermes_session_id}`
+          : undefined,
+    });
+    synthesized = strategist.plan;
+    source = strategist.source;
+    note = strategist.note;
+  }
+
   const row = {
     session_id,
     sales_campaign_id: campaign.id,
@@ -143,12 +190,17 @@ export async function POST(request: Request): Promise<Response> {
     estimated_activity: synthesized.estimated_activity,
     approval_scope: synthesized.approval_scope,
     status: "draft",
-    revise_note: revise_note ?? null,
+    revise_note: revise_note ?? note ?? null,
     updated_at: new Date().toISOString(),
   };
 
   const { data, error } = await sb.from("sales_plans").insert(row).select("*").single();
   if (error) return Response.json({ error: error.message }, { status: 500 });
 
-  return Response.json({ persisted: true, plan: rowToPlan(data) });
+  return Response.json({
+    persisted: true,
+    plan: rowToPlan(data),
+    source,
+    note: note ?? null,
+  });
 }

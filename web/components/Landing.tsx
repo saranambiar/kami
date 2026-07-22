@@ -11,8 +11,12 @@ export interface LaunchParams {
 }
 
 interface LandingProps {
-  onLaunch: (params: LaunchParams) => void;
+  onLaunch: (params: LaunchParams) => void | Promise<void>;
   busy: boolean;
+  error?: string | null;
+  resumePrompt?: { domain: string; dbId: string; hermesId: string } | null;
+  onResume?: () => void;
+  onDismissResume?: () => void;
 }
 
 const FEATURES = [
@@ -24,12 +28,19 @@ const FEATURES = [
   { title: "Minimalist by design", body: "No dashboards full of noise. Paper, ink, and the work that matters." },
 ];
 
-export default function Landing({ onLaunch, busy }: LandingProps) {
+export default function Landing({
+  onLaunch,
+  busy,
+  error,
+  resumePrompt,
+  onResume,
+  onDismissResume,
+}: LandingProps) {
   const [domain, setDomain] = useState("");
   const [goals, setGoals] = useState<string[]>([]);
   const [stage, setStage] = useState<string | null>(null);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     const cleaned = domain
       .trim()
@@ -37,12 +48,11 @@ export default function Landing({ onLaunch, busy }: LandingProps) {
       .replace(/^https?:\/\//, "")
       .replace(/\/.*$/, "");
     if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(cleaned)) return;
-    onLaunch({ domain: cleaned, goals, stage });
+    await onLaunch({ domain: cleaned, goals, stage });
   }
 
   return (
     <div>
-      {/* Centered hero */}
       <section
         style={{
           minHeight: "calc(100vh - 140px)",
@@ -61,6 +71,28 @@ export default function Landing({ onLaunch, busy }: LandingProps) {
         <p style={{ color: "var(--ink-soft)", fontSize: 20, marginTop: "-0.5rem" }}>
           Your AI Marketing Team
         </p>
+
+        {resumePrompt && (
+          <div className="kraft-card" style={{ maxWidth: 420, textAlign: "left", padding: "var(--stack-md)" }}>
+            <p style={{ marginBottom: "var(--stack-sm)" }}>
+              Continue previous campaign for <strong>{resumePrompt.domain}</strong>?
+            </p>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              <button type="button" className="hanko-btn" onClick={onResume} disabled={busy}>
+                Continue
+              </button>
+              <button
+                type="button"
+                className="mono"
+                onClick={onDismissResume}
+                disabled={busy}
+                style={{ border: "1px solid var(--ink)", background: "transparent", padding: "0.4rem 0.75rem", cursor: "pointer" }}
+              >
+                Start new
+              </button>
+            </div>
+          </div>
+        )}
 
         <form
           onSubmit={submit}
@@ -87,9 +119,15 @@ export default function Landing({ onLaunch, busy }: LandingProps) {
             />
           </div>
           <button className="hanko-btn" type="submit" disabled={busy}>
-            {busy ? "Folding…" : "Begin"}
+            {busy ? "Checking…" : "Begin"}
           </button>
         </form>
+
+        {error && (
+          <p className="mono" style={{ color: "var(--hanko)", maxWidth: 420, fontSize: 13 }}>
+            {error}
+          </p>
+        )}
 
         <GoalChips
           goals={goals}
@@ -104,7 +142,6 @@ export default function Landing({ onLaunch, busy }: LandingProps) {
         </div>
       </section>
 
-      {/* Feature cards */}
       <section style={{ paddingBottom: "var(--stack-lg)" }}>
         <hr className="crease" />
         <p className="label-caps" style={{ textAlign: "center", margin: "var(--stack-md) 0" }}>

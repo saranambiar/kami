@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Dossier } from "@/lib/hermes";
 import type { SalesCampaignConfig, SalesPlan } from "@/lib/salesTypes";
+import type { SalesSegment } from "@/lib/salesSegments";
 import SalesSetup from "@/components/SalesSetup";
 import SalesPlanView from "@/components/SalesPlanView";
 import SalesDraftQueue from "@/components/SalesDraftQueue";
@@ -13,13 +14,15 @@ import SalesInbox from "@/components/SalesInbox";
 import MeetingQueue from "@/components/MeetingQueue";
 import SalesTaskBoard from "@/components/SalesTaskBoard";
 import KillSwitch from "@/components/KillSwitch";
+import SegmentConfirm from "@/components/SegmentConfirm";
 
-/** Steps shown after setup is complete (Confirm is full-screen SalesSetup only). */
-export type SalesGuidedStep = "confirm" | "plan" | "find" | "emails" | "needs";
+/** Steps shown after setup is complete (Confirm who/what is full-screen SalesSetup only). */
+export type SalesGuidedStep = "confirm" | "segments" | "plan" | "find" | "emails" | "needs";
 
-type OpsStep = "plan" | "find" | "emails" | "needs";
+type OpsStep = "segments" | "plan" | "find" | "emails" | "needs";
 
 const OPS_STEPS: { key: OpsStep; label: string }[] = [
+  { key: "segments", label: "Confirm ICP" },
   { key: "plan", label: "Plan" },
   { key: "find", label: "Find" },
   { key: "emails", label: "Emails" },
@@ -31,11 +34,13 @@ interface SalesPanelProps {
   config: SalesCampaignConfig | null;
   dossier: Dossier | null;
   domain: string;
+  goals?: string[];
   focusStep?: SalesGuidedStep | null;
   onSetup: (config: SalesCampaignConfig) => void;
 }
 
-function defaultOpsStep(plan: SalesPlan | null): OpsStep {
+function defaultOpsStep(config: SalesCampaignConfig | null, plan: SalesPlan | null): OpsStep {
+  if (!config?.segments_confirmed_at) return "segments";
   if (!plan || plan.status !== "approved") return "plan";
   return "find";
 }
@@ -45,17 +50,23 @@ export default function SalesPanel({
   config,
   dossier,
   domain,
+  goals,
   focusStep,
   onSetup,
 }: SalesPanelProps) {
   const [plan, setPlan] = useState<SalesPlan | null>(null);
+  const [segments, setSegments] = useState<SalesSegment[] | null>(
+    (config?.segments as SalesSegment[] | null) ?? null,
+  );
   const [showSettings, setShowSettings] = useState(false);
   const [paused, setPaused] = useState(config?.autonomous_paused ?? false);
   const [pauseSaving, setPauseSaving] = useState(false);
-  const [step, setStep] = useState<OpsStep>("plan");
+  const [step, setStep] = useState<OpsStep>("segments");
   const [showMore, setShowMore] = useState(false);
   const [hasSent, setHasSent] = useState(false);
   const [sequencesCreated, setSequencesCreated] = useState(false);
+
+  const segmentsConfirmed = Boolean(config?.segments_confirmed_at);
 
   const fetchPlan = useCallback(() => {
     if (!sessionDbId) return;
@@ -64,53 +75,87 @@ export default function SalesPanel({
       .then((j) => {
         const p = j.plan ?? null;
         setPlan(p);
-        setStep((prev) => {
-          if (p?.status === "approved" && prev === "plan") return "find";
-          return prev;
-        });
       })
       .catch(() => {});
   }, [sessionDbId]);
 
   useEffect(() => {
     setPaused(config?.autonomous_paused ?? false);
-  }, [config?.autonomous_paused]);
+    if (config?.segments) setSegments(config.segments as SalesSegment[]);
+  }, [config?.autonomous_paused, config?.segments]);
+
+  // Always land on Confirm ICP until segments_confirmed_at is set in the DB.
+  useEffect(() => {
+    if (!config) return;
+    fetchPlan();
+    if (!config.segments_confirmed_at) {
+      setStep("segments");
+      return;
+    }
+    // plan may still be loading — stay on plan until we know approval state
+    setStep("plan");
+  }, [config?.session_id, config?.segments_confirmed_at, fetchPlan, config]);
 
   useEffect(() => {
-    if (config) fetchPlan();
-  }, [config, fetchPlan]);
+    if (!config?.segments_confirmed_at || !plan) return;
+    if (focusStep === "find" || focusStep === "emails" || focusStep === "needs") return;
+    setStep(defaultOpsStep(config, plan));
+  }, [plan?.status, plan?.id, config, focusStep]);
 
   useEffect(() => {
     if (!focusStep || focusStep === "confirm") return;
-    setStep(focusStep);
-  }, [focusStep]);
-
-  useEffect(() => {
-    if (config && !focusStep) {
-      setStep(defaultOpsStep(plan));
+    if (!config?.segments_confirmed_at) {
+      setStep("segments");
+      return;
     }
-    // Only re-default when config first appears or plan status flips to approved from null
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config?.session_id, plan?.status]);
+    if (focusStep === "segments") setStep("segments");
+    else if (focusStep === "plan" || focusStep === "find" || focusStep === "emails" || focusStep === "needs") {
+      setStep(focusStep);
+    }
+  }, [focusStep, config?.segments_confirmed_at]);
 
   const planApproved = plan?.status === "approved";
 
   const stepDone = useMemo(
     () => ({
+      segments: segmentsConfirmed,
       plan: planApproved,
       find: sequencesCreated,
       emails: hasSent,
       needs: hasSent,
     }),
-    [planApproved, sequencesCreated, hasSent],
+    [segmentsConfirmed, planApproved, sequencesCreated, hasSent],
   );
 
   function canVisit(key: OpsStep): boolean {
-    if (key === "plan") return true;
-    if (key === "find") return planApproved;
-    if (key === "emails") return planApproved && sequencesCreated;
-    if (key === "needs") return planApproved && (sequencesCreated || hasSent);
+    if (key === "segments") return true;
+    if (key === "plan") return segmentsConfirmed;
+    if (key === "find") return segmentsConfirmed && planApproved;
+    if (key === "emails") return segmentsConfirmed && planApproved && sequencesCreated;
+    if (key === "needs") return segmentsConfirmed && planApproved && (sequencesCreated || hasSent);
     return false;
+  }
+
+  async function handleSegmentsConfirmed(next: SalesSegment[]) {
+    setSegments(next);
+    if (config) {
+      onSetup({
+        ...config,
+        segments: next,
+        segments_confirmed_at: new Date().toISOString(),
+      });
+    }
+    if (sessionDbId) {
+      const res = await fetch("/api/sales/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionDbId }),
+      });
+      const json = await res.json();
+      if (res.ok && json.plan) setPlan(json.plan);
+      else fetchPlan();
+    }
+    setStep("plan");
   }
 
   async function handlePauseChange(nextPaused: boolean) {
@@ -140,14 +185,66 @@ export default function SalesPanel({
         sessionDbId={sessionDbId}
         dossier={dossier}
         domain={domain}
+        goals={goals}
         existingConfig={showSettings ? config : null}
-        onComplete={(c, planGenerated) => {
+        onComplete={(c) => {
           onSetup(c);
           setShowSettings(false);
-          setStep("plan");
-          if (planGenerated) fetchPlan();
+          setStep("segments");
         }}
       />
+    );
+  }
+
+  if (!sessionDbId) {
+    return (
+      <p className="mono" style={{ color: "var(--hanko)", padding: "var(--stack-md)" }}>
+        Session not ready — wait for Overview research to finish before outbound.
+      </p>
+    );
+  }
+
+  // Hard gate: until DB has segments_confirmed_at, only show Confirm ICP (no Find UI).
+  if (!segmentsConfirmed) {
+    return (
+      <div className="sales-panel">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--stack-sm)" }}>
+          <p className="label-caps">Outbound sales</p>
+          <div style={{ display: "flex", gap: "var(--stack-sm)", alignItems: "center" }}>
+            <button
+              type="button"
+              className="mono"
+              onClick={() => setShowSettings(true)}
+              style={{ border: "1px solid var(--ink)", background: "transparent", padding: "0.3rem 0.6rem", cursor: "pointer", fontSize: 12 }}
+              title="Edit who and what"
+            >
+              ⚙
+            </button>
+            <KillSwitch paused={paused} onChange={handlePauseChange} disabled={pauseSaving || !sessionDbId} />
+          </div>
+        </div>
+        <hr className="crease" />
+        <nav className="sales-stepper" aria-label="Sales progress">
+          {OPS_STEPS.map((s) => {
+            const unlocked = canVisit(s.key);
+            const active = s.key === "segments";
+            return (
+              <button
+                key={s.key}
+                type="button"
+                className="sales-step"
+                data-active={active}
+                data-blocked={s.key === "segments"}
+                onClick={() => unlocked && setStep(s.key)}
+                disabled={!unlocked}
+              >
+                {s.label}
+              </button>
+            );
+          })}
+        </nav>
+        <SegmentConfirm sessionDbId={sessionDbId} onConfirmed={handleSegmentsConfirmed} />
+      </div>
     );
   }
 
@@ -192,11 +289,16 @@ export default function SalesPanel({
         })}
       </nav>
 
+      {step === "segments" && (
+        <SegmentConfirm sessionDbId={sessionDbId} onConfirmed={handleSegmentsConfirmed} />
+      )}
+
       {step === "plan" && (
         <SalesPlanView
           sessionDbId={sessionDbId}
           plan={plan}
           offer={config.offer}
+          segments={segments}
           onApproved={(p) => {
             setPlan(p);
             setStep("find");
@@ -210,6 +312,7 @@ export default function SalesPanel({
           sessionDbId={sessionDbId}
           plan={plan}
           offer={config.offer}
+          segments={segments}
           paused={paused}
           onContinue={() => {
             setSequencesCreated(true);

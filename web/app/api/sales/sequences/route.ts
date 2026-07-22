@@ -87,6 +87,16 @@ export async function POST(request: Request): Promise<Response> {
 
   if (seqErr) return Response.json({ error: seqErr.message }, { status: 500 });
 
+  const { data: sessionRow } = await sb
+    .from("agent_sessions")
+    .select("goals_list")
+    .eq("id", session_id)
+    .maybeSingle();
+  const goalsList = Array.isArray(sessionRow?.goals_list)
+    ? (sessionRow!.goals_list as string[])
+    : [];
+  const goal = goalsList[0] ?? "";
+
   const enrolled: string[] = [];
   const skipped: { account_id: string; reason: string }[] = [];
 
@@ -124,6 +134,7 @@ export async function POST(request: Request): Promise<Response> {
         domain: account.domain,
       },
       signals: (signals ?? []) as AccountSignal[],
+      goal,
     });
 
     const { data: enrollment, error: enrErr } = await sb

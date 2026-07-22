@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   AccountSignal,
   LeadScoreFactors,
@@ -8,7 +8,10 @@ import type {
   SalesAccount,
   SalesPlan,
 } from "@/lib/salesTypes";
+import type { SalesSegment } from "@/lib/salesSegments";
 import { scoreLabel } from "@/lib/salesMotionLabels";
+import SalesFunnel from "@/components/SalesFunnel";
+import SalesBusyOverlay from "@/components/SalesBusyOverlay";
 
 interface AccountContact {
   id?: string;
@@ -29,6 +32,7 @@ interface SalesTargetReviewProps {
   sessionDbId: string | null;
   plan: SalesPlan | null;
   offer?: string;
+  segments?: SalesSegment[] | null;
   paused?: boolean;
   onContinue?: () => void;
 }
@@ -44,12 +48,15 @@ export default function SalesTargetReview({
   sessionDbId,
   plan,
   offer,
+  segments,
   paused,
   onContinue,
 }: SalesTargetReviewProps) {
   const [accounts, setAccounts] = useState<AccountWithMeta[]>([]);
   const [busy, setBusy] = useState(false);
+  const [busyMode, setBusyMode] = useState<"discover" | "emails" | "continue" | null>(null);
   const [discoverMsg, setDiscoverMsg] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [emailBanner, setEmailBanner] = useState<string | null>(null);
   const [emailDrafts, setEmailDrafts] = useState<Record<string, string>>({});
@@ -84,12 +91,24 @@ export default function SalesTargetReview({
     if (planApproved) fetchAccounts();
   }, [planApproved, fetchAccounts]);
 
+  const grouped = useMemo(() => {
+    const map = new Map<string, AccountWithMeta[]>();
+    for (const acc of accounts) {
+      const key = acc.segment_key || acc.industry || "Other";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(acc);
+    }
+    return [...map.entries()];
+  }, [accounts]);
+
   async function runDiscovery() {
     if (!sessionDbId || paused) return;
     setBusy(true);
+    setBusyMode("discover");
     setError(null);
     setEmailBanner(null);
     setDiscoverMsg(null);
+    setWarnings([]);
     try {
       const res = await fetch("/api/sales/discover", {
         method: "POST",
@@ -101,12 +120,70 @@ export default function SalesTargetReview({
         setError(json.error ?? "Discovery failed");
         return;
       }
-      setDiscoverMsg(
-        `Found ${json.count ?? 0} companies — check Include on the ones you want, then add emails.`,
-      );
+      const warn = (json.warnings as string[]) ?? [];
+      setWarnings(warn);
+      if ((json.count ?? 0) === 0) {
+        setDiscoverMsg(
+          warn[0] ??
+            "No verifiable companies found — go back to ICP and refine segments or add real company domains.",
+        );
+      } else {
+        const withEmail = (json.accounts as { email?: string | null }[] | undefined)?.filter((a) => a.email)
+          .length ?? 0;
+        setDiscoverMsg(
+          `Found ${json.count} companies (${withEmail} with a public email). Check Include — Hermes/Linkup filled emails when evidence existed.`,
+        );
+      }
       await fetchAccounts();
     } finally {
       setBusy(false);
+      setBusyMode(null);
+    }
+  }
+
+  async function findEmailsWithHermes() {
+    if (!sessionDbId || paused || busy) return;
+    const selected = accounts.filter((a) => a.id && isIncluded(a) && !a.contact?.email);
+    const targets = selected.length
+      ? selected
+      : accounts.filter((a) => a.id && !a.contact?.email);
+
+    if (!targets.length) {
+      setEmailBanner(null);
+      setDiscoverMsg("Every company already has an email, or none are listed yet.");
+      return;
+    }
+
+    setBusy(true);
+    setBusyMode("emails");
+    setError(null);
+    setEmailBanner(null);
+    try {
+      const res = await fetch("/api/sales/contacts/find", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionDbId,
+          account_ids: targets.map((a) => a.id),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Email lookup failed");
+        return;
+      }
+      setDiscoverMsg(json.message ?? `Found ${json.found ?? 0} emails`);
+      if ((json.found ?? 0) === 0) {
+        setEmailBanner(
+          "Hermes found no public emails on those domains — add manually or uncheck companies without email.",
+        );
+      } else {
+        setEmailBanner(null);
+      }
+      await fetchAccounts();
+    } finally {
+      setBusy(false);
+      setBusyMode(null);
     }
   }
 
@@ -168,13 +245,14 @@ export default function SalesTargetReview({
     });
     if (missingEmails.length) {
       setEmailBanner(
-        `${missingEmails.length} of ${selected.length} selected companies need a contact email — add emails or uncheck them.`,
+        `${missingEmails.length} of ${selected.length} selected companies need a contact email — use “Find emails with Hermes”, add emails, or uncheck them.`,
       );
       setError(null);
       return;
     }
 
     setBusy(true);
+    setBusyMode("continue");
     setError(null);
     setEmailBanner(null);
     try {
@@ -193,15 +271,7 @@ export default function SalesTargetReview({
 
       if (!accountIds.length) {
         setEmailBanner(
-          `${selected.length} of ${selected.length} selected companies need a contact email — add emails or uncheck them.`,
-        );
-        return;
-      }
-
-      const stillMissing = fresh.filter((a) => a.id && isIncluded(a) && !a.contact?.email);
-      if (stillMissing.length) {
-        setEmailBanner(
-          `${stillMissing.length} of ${selected.length} selected companies need a contact email — add emails or uncheck them.`,
+          `${selected.length} of ${selected.length} selected companies need a contact email — use “Find emails with Hermes” or add emails.`,
         );
         return;
       }
@@ -246,36 +316,77 @@ export default function SalesTargetReview({
       onContinue?.();
     } finally {
       setBusy(false);
+      setBusyMode(null);
     }
   }
 
   if (!planApproved) {
     return (
       <div className="kraft-card" style={{ padding: "var(--stack-md)", marginTop: "var(--stack-md)" }}>
-        <p className="label-caps" style={{ color: "var(--outline)" }}>Find companies</p>
+        <p className="label-caps" style={{ color: "var(--outline)" }}>
+          Find companies
+        </p>
         <p className="mono" style={{ color: "var(--ink-soft)", marginTop: "var(--stack-sm)", fontSize: 13 }}>
-          Approve your plan first, then we&apos;ll research companies that match.
+          Approve your plan first, then we&apos;ll research companies that match your confirmed segments.
         </p>
       </div>
     );
   }
 
   const includedCount = accounts.filter((a) => isIncluded(a)).length;
+  const missingEmailSelected = accounts.filter(
+    (a) => a.id && isIncluded(a) && !a.contact?.email,
+  ).length;
+
+  const busyTitle =
+    busyMode === "emails"
+      ? "Finding contact emails"
+      : busyMode === "continue"
+        ? "Building sequences"
+        : "Finding companies";
+
+  const busyStages =
+    busyMode === "emails"
+      ? [
+          "Scraping company contact pages…",
+          "Searching Linkup for @domain emails…",
+          "Asking Hermes to extract only evidenced addresses…",
+          "Saving verified contacts…",
+        ]
+      : busyMode === "continue"
+        ? ["Saving emails…", "Enrolling sequences…", "Queueing drafts…"]
+        : undefined;
 
   return (
-    <div className="kraft-card" style={{ padding: "var(--stack-md)", marginTop: "var(--stack-md)" }}>
+    <div className="kraft-card" style={{ padding: "var(--stack-md)", marginTop: "var(--stack-md)", position: "relative" }}>
+      {busy && <SalesBusyOverlay title={busyTitle} stages={busyStages} />}
+
       {offer && (
         <p className="mono" style={{ fontSize: 12, color: "var(--ink-soft)", marginBottom: "var(--stack-sm)" }}>
-          Selling: {offer.slice(0, 160)}{offer.length > 160 ? "…" : ""}
+          Selling: {offer.slice(0, 160)}
+          {offer.length > 160 ? "…" : ""}
         </p>
       )}
+
+      <SalesFunnel segments={segments} plan={plan} accounts={accounts} />
+
       <p className="sales-intro" style={{ marginBottom: "var(--stack-md)" }}>
-        Research companies, check Include on who to pursue, and add a real email for each one you select.
+        We verify named companies from your segments, look up public emails (site → Linkup → Hermes),
+        and score Fit × Timing. Check Include, then continue.
       </p>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--stack-sm)", flexWrap: "wrap", gap: "var(--stack-sm)" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "var(--stack-sm)",
+          flexWrap: "wrap",
+          gap: "var(--stack-sm)",
+        }}
+      >
         <p className="label-caps">Find companies</p>
-        <div style={{ display: "flex", gap: "var(--stack-sm)" }}>
+        <div style={{ display: "flex", gap: "var(--stack-sm)", flexWrap: "wrap" }}>
           <button
             type="button"
             className="hanko-btn"
@@ -283,7 +394,22 @@ export default function SalesTargetReview({
             disabled={busy || paused}
             style={{ opacity: paused ? 0.5 : 1 }}
           >
-            {busy ? "…" : "Find companies"}
+            {busy && busyMode === "discover" ? "Finding…" : "Find companies"}
+          </button>
+          <button
+            type="button"
+            className="mono"
+            onClick={findEmailsWithHermes}
+            disabled={busy || paused || !accounts.length}
+            style={{
+              border: "1px solid var(--ink)",
+              background: "transparent",
+              padding: "0.4rem 0.75rem",
+              cursor: busy || paused || !accounts.length ? "not-allowed" : "pointer",
+            }}
+            title="Scrape + Linkup + Hermes — never invents emails"
+          >
+            {busy && busyMode === "emails" ? "Looking up…" : "Find emails with Hermes"}
           </button>
           {includedCount > 0 && (
             <button
@@ -291,7 +417,12 @@ export default function SalesTargetReview({
               className="mono"
               onClick={continueWithSelected}
               disabled={busy}
-              style={{ border: "1px solid var(--ink)", background: "transparent", padding: "0.4rem 0.75rem", cursor: "pointer" }}
+              style={{
+                border: "1px solid var(--ink)",
+                background: "transparent",
+                padding: "0.4rem 0.75rem",
+                cursor: "pointer",
+              }}
             >
               Continue with selected ({includedCount})
             </button>
@@ -310,7 +441,17 @@ export default function SalesTargetReview({
             background: "var(--kraft)",
           }}
         >
-          <p style={{ fontSize: 14 }}>{emailBanner}</p>
+          <p style={{ fontSize: 14, marginBottom: missingEmailSelected ? "0.5rem" : 0 }}>{emailBanner}</p>
+          {missingEmailSelected > 0 && (
+            <button
+              type="button"
+              className="hanko-btn"
+              onClick={findEmailsWithHermes}
+              disabled={busy || paused}
+            >
+              Find emails with Hermes ({missingEmailSelected})
+            </button>
+          )}
         </div>
       )}
 
@@ -324,107 +465,139 @@ export default function SalesTargetReview({
           {discoverMsg}
         </p>
       )}
+      {warnings.map((w, i) => (
+        <p key={i} className="mono" style={{ color: "var(--ink-soft)", fontSize: 12, marginBottom: 4 }}>
+          ⚠ {w}
+        </p>
+      ))}
 
       {!accounts.length ? (
         <p className="mono" style={{ color: "var(--ink-soft)", fontSize: 13, padding: "var(--stack-sm) 0" }}>
-          No companies yet — click Find companies to research targets from live web signals.
+          No companies yet — click Find companies to verify targets from your confirmed segments.
         </p>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--stack-sm)" }}>
-          {accounts.map((acc) => {
-            const selected = isIncluded(acc);
-            const factors = acc.score?.factors;
-
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--stack-md)" }}>
+          {grouped.map(([groupKey, groupAccounts]) => {
+            const segName = segments?.find((s) => s.key === groupKey)?.name ?? groupKey;
             return (
-              <div
-                key={acc.id}
-                style={{
-                  border: "1px solid var(--outline-variant)",
-                  padding: "var(--stack-sm)",
-                  opacity: selected ? 1 : 0.75,
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "0.5rem" }}>
-                  <div>
-                    <strong>{acc.name}</strong>
-                    {acc.domain && (
-                      <span className="mono" style={{ marginLeft: "0.5rem", fontSize: 12, color: "var(--ink-soft)" }}>
-                        {acc.domain}
-                      </span>
-                    )}
-                  </div>
-                  <label className="mono" style={{ fontSize: 12, cursor: "pointer" }}>
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      onChange={(e) => toggleInclusion(acc, e.target.checked)}
-                      style={{ marginRight: "0.35rem" }}
-                    />
-                    Include
-                  </label>
-                </div>
+              <div key={groupKey}>
+                <p className="label-caps" style={{ marginBottom: "var(--stack-sm)" }}>
+                  {segName}
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "var(--stack-sm)" }}>
+                  {groupAccounts.map((acc) => {
+                    const selected = isIncluded(acc);
+                    const factors = acc.score?.factors;
 
-                {factors && (
-                  <div className="mono" style={{ fontSize: 11, color: "var(--ink-soft)", marginTop: "0.35rem" }}>
-                    {scoreLabel("fit", factors.fit)} · {scoreLabel("intent", factors.intent)} ·{" "}
-                    {scoreLabel("contactability", factors.contactability)}
-                  </div>
-                )}
-                {acc.score?.explanation && (
-                  <p style={{ fontSize: 13, color: "var(--ink-soft)", margin: "0.25rem 0" }}>
-                    {acc.score.explanation}
-                  </p>
-                )}
-
-                {acc.signals?.length ? (
-                  <ul style={{ fontSize: 12, paddingLeft: "1.1rem", margin: "0.25rem 0 0" }}>
-                    {acc.signals.map((sig, i) => (
-                      <li key={sig.id ?? `${sig.source_url}-${i}`}>
-                        {sig.detail ?? sig.signal_type}
-                        {sig.source_url && (
-                          <>
-                            {" — "}
-                            <a href={sig.source_url} target="_blank" rel="noopener noreferrer">
-                              source
-                            </a>
-                          </>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mono" style={{ fontSize: 11, color: "var(--outline)", marginTop: "0.25rem" }}>
-                    No public signal yet — you can still include if they fit your ICP.
-                  </p>
-                )}
-
-                {selected && (
-                  <div className="sales-inline-email">
-                    {acc.contact?.email ? (
-                      <span className="mono" style={{ fontSize: 12 }}>Email: {acc.contact.email}</span>
-                    ) : (
-                      <>
-                        <input
-                          type="email"
-                          placeholder="Add contact email"
-                          value={emailDrafts[acc.id ?? ""] ?? ""}
-                          onChange={(e) =>
-                            setEmailDrafts((d) => ({ ...d, [acc.id!]: e.target.value }))
-                          }
-                        />
-                        <button
-                          type="button"
-                          className="mono"
-                          disabled={savingEmailId === acc.id}
-                          onClick={() => saveEmail(acc)}
-                          style={{ border: "1px solid var(--ink)", background: "transparent", padding: "0.3rem 0.6rem", cursor: "pointer", fontSize: 11 }}
+                    return (
+                      <div
+                        key={acc.id}
+                        style={{
+                          border: "1px solid var(--outline-variant)",
+                          padding: "var(--stack-sm)",
+                          opacity: selected ? 1 : 0.75,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "baseline",
+                            flexWrap: "wrap",
+                            gap: "0.5rem",
+                          }}
                         >
-                          Save
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
+                          <div>
+                            <strong>{acc.name}</strong>
+                            {acc.domain && (
+                              <span
+                                className="mono"
+                                style={{ marginLeft: "0.5rem", fontSize: 12, color: "var(--ink-soft)" }}
+                              >
+                                {acc.domain}
+                              </span>
+                            )}
+                          </div>
+                          <label className="mono" style={{ fontSize: 12, cursor: "pointer" }}>
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={(e) => toggleInclusion(acc, e.target.checked)}
+                              style={{ marginRight: "0.35rem" }}
+                            />
+                            Include
+                          </label>
+                        </div>
+
+                        {factors && (
+                          <div className="mono" style={{ fontSize: 11, color: "var(--ink-soft)", marginTop: "0.35rem" }}>
+                            {scoreLabel("fit", factors.fit)} · {scoreLabel("intent", factors.intent)} ·{" "}
+                            {scoreLabel("contactability", factors.contactability)}
+                          </div>
+                        )}
+                        {acc.score?.explanation && (
+                          <p style={{ fontSize: 13, color: "var(--ink-soft)", margin: "0.25rem 0" }}>
+                            {acc.score.explanation}
+                          </p>
+                        )}
+
+                        {acc.signals?.length ? (
+                          <ul style={{ fontSize: 12, paddingLeft: "1.1rem", margin: "0.25rem 0 0" }}>
+                            {acc.signals.map((sig, i) => (
+                              <li key={sig.id ?? `${sig.source_url}-${i}`}>
+                                {sig.detail ?? sig.signal_type}
+                                {sig.source_url && (
+                                  <>
+                                    {" — "}
+                                    <a href={sig.source_url} target="_blank" rel="noopener noreferrer">
+                                      source
+                                    </a>
+                                  </>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+
+                        {selected && (
+                          <div className="sales-inline-email">
+                            {acc.contact?.email ? (
+                              <span className="mono" style={{ fontSize: 12 }}>
+                                Email: {acc.contact.email}
+                              </span>
+                            ) : (
+                              <>
+                                <input
+                                  type="email"
+                                  placeholder="Add contact email"
+                                  value={emailDrafts[acc.id ?? ""] ?? ""}
+                                  onChange={(e) =>
+                                    setEmailDrafts((d) => ({ ...d, [acc.id!]: e.target.value }))
+                                  }
+                                />
+                                <button
+                                  type="button"
+                                  className="mono"
+                                  disabled={savingEmailId === acc.id}
+                                  onClick={() => saveEmail(acc)}
+                                  style={{
+                                    border: "1px solid var(--ink)",
+                                    background: "transparent",
+                                    padding: "0.3rem 0.6rem",
+                                    cursor: "pointer",
+                                    fontSize: 11,
+                                  }}
+                                >
+                                  Save
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}

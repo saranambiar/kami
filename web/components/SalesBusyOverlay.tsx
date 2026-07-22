@@ -1,0 +1,57 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+const DEFAULT_STAGES = [
+  "Verifying company domains…",
+  "Searching live signals…",
+  "Looking up public contact emails…",
+  "Asking Hermes when the site has no mailto…",
+  "Scoring Fit × Timing…",
+];
+
+interface SalesBusyOverlayProps {
+  title?: string;
+  stages?: string[];
+  /** Optional live status line from the caller */
+  detail?: string | null;
+}
+
+/** Full-panel busy state so Find never looks “stuck with just …”. */
+export default function SalesBusyOverlay({
+  title = "Working…",
+  stages = DEFAULT_STAGES,
+  detail,
+}: SalesBusyOverlayProps) {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    if (stages.length <= 1) return;
+    const id = window.setInterval(() => {
+      setIndex((i) => (i + 1) % stages.length);
+    }, 3500);
+    return () => window.clearInterval(id);
+  }, [stages]);
+
+  const stage = stages[index] ?? stages[0];
+
+  return (
+    <div className="sales-busy" role="status" aria-live="polite" aria-busy="true">
+      <div className="sales-busy-bar" aria-hidden />
+      <p className="label-caps" style={{ marginBottom: "0.75rem" }}>
+        {title}
+      </p>
+      <p className="sales-busy-stage">{detail?.trim() || stage}</p>
+      <p className="mono" style={{ fontSize: 11, color: "var(--ink-soft)", marginTop: "0.75rem" }}>
+        This can take 30–90 seconds — domains are checked live.
+      </p>
+      <ul className="sales-busy-ticks mono">
+        {stages.map((s, i) => (
+          <li key={s} data-active={i === index}>
+            {i < index ? "✓" : i === index ? "→" : "·"} {s.replace(/…$/, "")}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}

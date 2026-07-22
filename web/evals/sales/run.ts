@@ -9,8 +9,23 @@ import {
   extractCompanyDomainsFromContent,
   isDomainBlocked,
   isListicleTitle,
+  normalizeCompanyDomain,
+  decayIntent,
+  scoreAccountAxes,
+  assignTierFromAxes,
 } from "../../lib/salesResearch";
 import { synthesizePlanFromConfig } from "../../lib/salesPlan";
+import { cleanPositioningLine, salesWhoLabel, dossierToNlPrefill } from "../../lib/salesDossierPrefill";
+import { normalizeDomainInput } from "../../lib/domainIdentity";
+import { validateDossier } from "../../lib/dossierValidation";
+import {
+  segmentsFromDossier,
+  type SalesSegment,
+} from "../../lib/salesSegments";
+import { validateSegmentsForConfirm } from "../../lib/salesSegmentGates";
+import { setupInvalidatesSegments } from "../../lib/salesSetupIntegrity";
+import { ctaFromGoal } from "../../lib/salesSequences";
+import type { DomainIdentity } from "../../lib/domainIdentity";
 import type { SalesCampaignConfig } from "../../lib/salesTypes";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -257,16 +272,46 @@ function runResearchAndPlanGates(passed: string[], failed: string[]): void {
     passed.push("research/blocklist_underdog");
   }
 
+  // Shorteners / aggregators from overhaul
+  for (const host of ["ow.ly", "ift.tt", "lnkd.in", "bit.ly", "ziprecruiter.com", "topstartups.io", "growthlist.co"]) {
+    if (!isDomainBlocked(host)) errors.push(`${host} should be blocked`);
+    else passed.push(`research/blocklist_${host.replace(/\./g, "_")}`);
+  }
+
   if (!isListicleTitle("Best SaaS Companies to Work for in United Kingdom 2026")) {
     errors.push("listicle title should be rejected");
   } else {
     passed.push("research/listicle_title_reject");
   }
 
+  if (!isListicleTitle("28 Hot Healthcare Startups Hiring Now")) {
+    errors.push("hot startups listicle should be rejected");
+  } else {
+    passed.push("research/listicle_hot_reject");
+  }
+
+  if (!isListicleTitle("Top 10 Telehealth Business Ideas 2026")) {
+    errors.push("business ideas listicle should be rejected");
+  } else {
+    passed.push("research/listicle_ideas_reject");
+  }
+
   if (isListicleTitle("Acme Robotics")) {
     errors.push("company name should not be treated as listicle");
   } else {
     passed.push("research/company_title_ok");
+  }
+
+  if (normalizeCompanyDomain("ow.ly") !== null) {
+    errors.push("normalizeCompanyDomain should reject ow.ly");
+  } else {
+    passed.push("research/normalize_reject_shortener");
+  }
+
+  if (normalizeCompanyDomain("acme.io") !== "acme.io") {
+    errors.push("normalizeCompanyDomain should accept acme.io");
+  } else {
+    passed.push("research/normalize_accept_company");
   }
 
   const extracted = extractCompanyDomainsFromContent(
@@ -278,6 +323,57 @@ function runResearchAndPlanGates(passed: string[], failed: string[]): void {
     errors.push(`content domain extract expected acme.io only, got ${extracted.join(",")}`);
   } else {
     passed.push("research/extract_company_from_content");
+  }
+
+  // Intent decay
+  if (!(decayIntent(7, 0.8) > decayIntent(30, 0.8) && decayIntent(30, 0.8) > decayIntent(90, 0.8))) {
+    errors.push("intent should decay with age");
+  } else {
+    passed.push("research/intent_decay");
+  }
+
+  const scored = scoreAccountAxes({
+    fit: 0.8,
+    intentRaw: 0.8,
+    hasVerifiedContact: true,
+    signalAgeDays: 10,
+  });
+  if (scored.priority <= 0 || !scored.explanation.includes("Fit")) {
+    errors.push("scoreAccountAxes should produce priority + plain explanation");
+  } else {
+    passed.push("research/fit_intent_score");
+  }
+
+  const gated = scoreAccountAxes({
+    fit: 0.1,
+    intentRaw: 0.9,
+    hasVerifiedContact: true,
+    signalAgeDays: 5,
+  });
+  if (gated.priority !== 0) {
+    errors.push("fit floor should zero priority");
+  } else {
+    passed.push("research/fit_floor_gate");
+  }
+
+  if (assignTierFromAxes(0.8, 0.7, true) !== 1) {
+    errors.push("tier 1 expected for high fit/intent + contact");
+  } else {
+    passed.push("research/tier_assign");
+  }
+
+  // Positioning cleanliness — no mid-word cut
+  const long =
+    "Cal.com sells customizable scheduling infrastructure for individuals, teams, enterprises, and developers rather than just a simple booking link. Its differentiators include deep embeds.";
+  const clean = cleanPositioningLine(long, "Cal.com");
+  if (clean.includes("differentia") && !clean.includes("differentiators")) {
+    errors.push("positioning line should not mid-word truncate");
+  } else if (clean.length > 140) {
+    errors.push(`positioning line too long: ${clean.length}`);
+  } else if (!clean.startsWith("Cal.com")) {
+    errors.push("positioning should keep first sentence start");
+  } else {
+    passed.push("plan/positioning_clean");
   }
 
   const plan = synthesizePlanFromConfig(
@@ -300,7 +396,279 @@ function runResearchAndPlanGates(passed: string[], failed: string[]): void {
     passed.push("plan/offer_in_synthesis");
   }
 
+  if (!plan.tiers[0]?.criteria.includes("Best-fit") && !plan.tiers[0]?.criteria.toLowerCase().includes("best-fit")) {
+    // plain English criteria
+    if (plan.tiers[0]?.criteria.includes("bullseye")) {
+      errors.push("tier criteria must not use ICP bullseye jargon");
+    } else {
+      passed.push("plan/plain_english_tiers");
+    }
+  } else {
+    passed.push("plan/plain_english_tiers");
+  }
+
+  // Email verification gate (logic): contactability without verified email stays low
+  const noEmail = scoreAccountAxes({ fit: 0.9, intentRaw: 0.9, hasVerifiedContact: false, signalAgeDays: 5 });
+  if (noEmail.contactability >= 0.6) {
+    errors.push("missing verified email must keep contactability low");
+  } else {
+    passed.push("research/email_verification_gate");
+  }
+
   for (const e of errors) failed.push(`research_plan_gates: ${e}`);
+}
+
+function runDomainTruthGates(passed: string[], failed: string[]): void {
+  const errors: string[] = [];
+
+  // Invalid domain normalization blocks before session/Hermes
+  if (normalizeDomainInput("not a domain") !== null) {
+    errors.push("normalizeDomainInput should reject free text");
+  } else if (normalizeDomainInput("localhost") !== null) {
+    errors.push("normalizeDomainInput should reject localhost");
+  } else if (normalizeDomainInput("https://arguslabs.in/about") !== "arguslabs.in") {
+    errors.push("normalizeDomainInput should strip path to host");
+  } else {
+    passed.push("domain/normalize_and_reject");
+  }
+
+  const argusIdentity: DomainIdentity = {
+    input: "arguslabs.in",
+    canonical_domain: "arguslabs.in",
+    final_url: "https://arguslabs.in/",
+    company_name: "Argus",
+    title: "Argus — AI agent observability",
+    description: "Debug and observe AI agents in production",
+    h1: "Agent observability",
+    excerpt:
+      "Argus helps teams debug AI agents with traces, evals, and production observability for LLM apps.",
+    evidence_url: "https://arguslabs.in/",
+    confidence: 0.9,
+    validated_at: new Date().toISOString(),
+  };
+
+  // Homonym reject: biomedical dossier vs agent-observability site
+  const badDossier = {
+    company: "Argus Labs",
+    brand_voice: "clinical",
+    positioning:
+      "Argus Labs is a biotech pharma company building healthcare clinic medical device diagnostics.",
+    canonical_domain: "arguslabs.in",
+    evidence_urls: ["https://arguslabs.in/"],
+    icp_buckets: [
+      { label: "Clinics", where_they_live: "hospitals", trigger_signal: "FDA", est_size: "1k", angle: "labs" },
+      { label: "Labs", where_they_live: "R&D", trigger_signal: "grant", est_size: "500", angle: "assay" },
+    ],
+    opportunities: [{ title: "Lab outreach", playbook: "outbound", detail: "reach clinics" }],
+    competitor_analysis: [],
+  };
+  const rejected = validateDossier(badDossier, argusIdentity);
+  if (rejected.ok) {
+    errors.push("validateDossier must reject healthcare narrative absent from first-party extract");
+  } else {
+    passed.push("domain/homonym_health_reject");
+  }
+
+  // Domain mismatch reject
+  const mismatch = validateDossier(
+    {
+      ...badDossier,
+      positioning: "Argus provides AI agent observability and debugging for production LLM systems.",
+      canonical_domain: "other-company.com",
+      evidence_urls: ["https://other-company.com/"],
+    },
+    argusIdentity,
+  );
+  if (mismatch.ok) {
+    errors.push("validateDossier must reject canonical_domain mismatch");
+  } else {
+    passed.push("domain/canonical_mismatch_reject");
+  }
+
+  // Good dossier for argus
+  const good = validateDossier(
+    {
+      company: "Argus",
+      brand_voice: "technical, precise",
+      positioning:
+        "Argus provides AI agent observability and debugging for production LLM and multi-agent systems.",
+      canonical_domain: "arguslabs.in",
+      evidence_urls: ["https://arguslabs.in/"],
+      product_category: "AI agent observability",
+      industries: ["AI infrastructure"],
+      personas: ["AI eng lead"],
+      icp_buckets: [
+        {
+          label: "AI platform teams",
+          where_they_live: "Slack / Discord",
+          trigger_signal: "shipping agents to prod",
+          est_size: "mid-market",
+          angle: "trace failures faster",
+        },
+        {
+          label: "Agent startups",
+          where_they_live: "X / HN",
+          trigger_signal: "launch week",
+          est_size: "seed-A",
+          angle: "eval + debug loop",
+        },
+      ],
+      opportunities: [
+        { title: "Agent observability outreach", playbook: "outbound", detail: "reach AI eng leads" },
+      ],
+      competitor_analysis: [{ name: "LangSmith", insight: "broader LLM ops" }],
+    },
+    argusIdentity,
+  );
+  if (!good.ok) {
+    errors.push(`good argus dossier should pass: ${good.errors.join("; ")}`);
+  } else if (!/observab|agent|debug|llm/i.test(good.dossier!.positioning)) {
+    errors.push("good dossier should keep agent-observability positioning");
+  } else {
+    passed.push("domain/argus_observability_ok");
+  }
+
+  // Product-neutral segment fallback — never Calendly/bookings/healthcare without evidence
+  const blankSegs = segmentsFromDossier(
+    {
+      company: "Argus",
+      brand_voice: "technical",
+      positioning: "AI agent observability for production debugging",
+      competitor_analysis: [],
+      icp_buckets: [],
+      opportunities: [],
+      product_category: "AI observability",
+    },
+    "arguslabs.in",
+  );
+  const blob = JSON.stringify(blankSegs).toLowerCase();
+  if (/\bcalendly\b|\bbookings?\b|\bhealthcare\b|\bbiotech\b/.test(blob)) {
+    errors.push("segmentsFromDossier must not inject Calendly/bookings/healthcare defaults");
+  } else {
+    passed.push("domain/product_neutral_segments");
+  }
+
+  const prefill = dossierToNlPrefill(
+    {
+      company: "Argus",
+      brand_voice: "technical",
+      positioning: "AI agent observability for production debugging of multi-agent systems.",
+      competitor_analysis: [],
+      icp_buckets: [],
+      opportunities: [],
+    },
+    "arguslabs.in",
+  );
+  const prefillBlob = JSON.stringify(prefill).toLowerCase();
+  if (/\bcalendly\b|\bbookings?\b|\b50-500\b|\bb2b saas\b/.test(prefillBlob)) {
+    errors.push("dossierToNlPrefill must not inject scheduling/SaaS size defaults");
+  } else {
+    passed.push("domain/product_neutral_prefill");
+  }
+
+  // Candidate-company validation
+  const b2bEmpty: SalesSegment[] = [
+    {
+      key: "s1",
+      name: "AI teams",
+      why_fit: "need observability",
+      firmographic: "",
+      technographic: "",
+      trigger_signal: "shipping agents",
+      motion: "b2b_sales_assisted",
+      target_persona: "Eng lead",
+      target_count: 5,
+      candidate_companies: [],
+      example_user_personas: [],
+    },
+  ];
+  if (!validateSegmentsForConfirm(b2bEmpty)?.includes("candidate")) {
+    errors.push("B2B segment without candidates must fail confirm validation");
+  } else {
+    passed.push("domain/candidate_required");
+  }
+
+  const b2bOk: SalesSegment[] = [
+    {
+      ...b2bEmpty[0],
+      candidate_companies: [{ name: "Acme Agents", domain: "acmeagents.dev", why: "ships agents" }],
+    },
+  ];
+  if (validateSegmentsForConfirm(b2bOk) !== null) {
+    errors.push("B2B segment with candidate should confirm");
+  } else {
+    passed.push("domain/candidate_ok");
+  }
+
+  // Setup change invalidates segments
+  const invalidate = setupInvalidatesSegments(
+    {
+      offer: "Old offer about X",
+      icp: { titles: ["VP Sales"], industries: ["SaaS"] },
+      geo: "US",
+    },
+    {
+      offer: "New offer about Y",
+      icp: { titles: ["VP Sales"], industries: ["SaaS"] },
+      geo: "US",
+    },
+  );
+  if (!invalidate) {
+    errors.push("offer change must invalidate segments");
+  } else {
+    passed.push("domain/setup_invalidates_segments");
+  }
+
+  const stable = setupInvalidatesSegments(
+    {
+      offer: "Same offer",
+      icp: { titles: ["VP Sales"], industries: ["SaaS"] },
+      geo: "US",
+    },
+    {
+      offer: "Same offer",
+      icp: { titles: ["VP Sales"], industries: ["SaaS"] },
+      geo: "US",
+    },
+  );
+  if (stable) {
+    errors.push("identical setup must not invalidate segments");
+  } else {
+    passed.push("domain/setup_stable");
+  }
+
+  // Goal-specific CTAs / labels
+  if (!ctaFromGoal("investor outreach").toLowerCase().includes("intro")) {
+    errors.push("investor goal should get intro CTA");
+  } else if (ctaFromGoal("product trial signups").toLowerCase().includes("15-minute")) {
+    errors.push("trial goal should not default to 15-minute call");
+  } else if (salesWhoLabel(["awareness"]).includes("book")) {
+    errors.push("awareness label should not say book meetings");
+  } else {
+    passed.push("domain/goal_aware_cta_labels");
+  }
+
+  // Offline plan says research confirmation when thin
+  const thinPlan = synthesizePlanFromConfig(
+    {
+      session_id: "eval",
+      offer: "confirm positioning from Overview research.",
+      icp: { titles: [], industries: [] },
+      allowed_channels: ["email"],
+      target_quantity: 10,
+      autonomy: { paused: false, auto_followups: true, require_first_send_approval: true },
+    },
+    "c1",
+    1,
+    null,
+  );
+  if (/\bcalendly\b|\bhealthcare\b/i.test(thinPlan.channel_rationale)) {
+    errors.push("thin plan must stay product-neutral");
+  } else {
+    passed.push("domain/thin_plan_neutral");
+  }
+
+  for (const e of errors) failed.push(`domain_truth: ${e}`);
 }
 
 function printManualPolicyChecks(scenarios: PolicyScenario[]): void {
@@ -323,6 +691,7 @@ function main(): void {
   runReplies(fixtures.replies, passed, failed);
   runSequences(fixtures.sequences, passed, failed);
   runResearchAndPlanGates(passed, failed);
+  runDomainTruthGates(passed, failed);
 
   console.log("Sales eval results");
   console.log("==================");

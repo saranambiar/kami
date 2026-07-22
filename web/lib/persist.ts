@@ -5,6 +5,10 @@ export async function createSession(params: {
   domain: string;
   goals: string[];
   stage: string | null;
+  canonical_domain?: string;
+  domain_validated_at?: string;
+  domain_check?: Record<string, unknown>;
+  research_snapshot?: Record<string, unknown>;
 }): Promise<string | null> {
   try {
     const res = await fetch("/api/sessions", {
@@ -21,7 +25,14 @@ export async function createSession(params: {
 
 export function persist(
   sessionDbId: string | null,
-  type: "dossier" | "activity" | "message" | "status" | "opportunity_status",
+  type:
+    | "dossier"
+    | "activity"
+    | "message"
+    | "status"
+    | "opportunity_status"
+    | "research_snapshot"
+    | "domain_check",
   payload: Record<string, unknown>,
 ): void {
   if (!sessionDbId) return;

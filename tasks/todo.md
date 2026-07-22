@@ -37,3 +37,25 @@
 - [x] **RCA P2:** eval gates for blocklist/listicle/offer; RCA decision log updated
 - [ ] **User:** re-test cal.com path — Find unchecked by default; no wellfound listicles; Continue banner when emails missing
 
+## CMO shared context — Phase 1 (2026-07-22)
+- [x] `web/lib/cmoContext.ts` — compact company pack from dossier/domain (+ sales summary)
+- [x] `cmoPrompt(question, contextPack)` — pack required; never invent
+- [x] Wire `CmoChat` + `Dashboard` (dossier / domain / sessionDbId / salesConfig); Supabase `raw_dossier` fallback
+- [x] Memory: `memory/cmo-context.md` (Phase 2 = kami-context MCP + companies + auth)
+- [ ] **User:** after cal.com dossier, ask CMO “what did you understand about this company?” — should answer from pack without paste
+
+## Sales pipeline overhaul (2026-07-22)
+- [x] `hermesServer.ts` + `salesSegments.ts` (Hermes derive + dossier fallback)
+- [x] Discovery rewrite: `researchFromSegments` + `salesContactFinder` + hardened blocklist/listicle/shortener reject + Fit×Intent scoring
+- [x] `/api/sales/segments` confirm gate; discover requires `segments_confirmed_at`; auto-persist verified emails
+- [x] Clean positioning + plain-English plan tiers; funnel budgets UI
+- [x] Stepper: ICP → Plan → Find → Emails → Needs you
+- [x] Skills `icp_segmentation` + signal_cold_email updates; evals **39 passed**
+- [ ] **User:** apply `007_sales_segments.sql` on Supabase, then re-test Confirm ICP → Plan → Find
+- [x] Domain identity gate + `/api/domain/validate` + migration `008_domain_truth.sql`
+- [x] Anchored Linkup research + dossier validation + failed-research UX + resume Continue/Start new
+- [x] Product-neutral Sales/CMO/CTA/segments (no Calendly/healthcare defaults)
+- [x] Hermes sales strategist, editable candidates, setup invalidation, signal-backed Find + discovery runs
+- [x] Evals + SETUP/memory/lessons
+- [ ] **User:** apply `008_domain_truth.sql` (and `007` if missing); test `arguslabs.in` + a bad domain on Landing
+- Note: teammate marketing migration is `005_connected_accounts_session.sql` — our sales migrations are `007`/`008` to avoid collision.
