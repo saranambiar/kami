@@ -1,23 +1,53 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import type { CandidateCompany, SalesSegment } from "@/lib/salesSegments";
 import { validateSegmentsForConfirm } from "@/lib/salesSegmentGates";
+import SalesBusyOverlay from "@/components/SalesBusyOverlay";
 
 interface SegmentConfirmProps {
   sessionDbId: string;
   onConfirmed: (segments: SalesSegment[]) => void;
 }
 
+/** Ensure PLG segments have at least one editable example-user row. */
+function seedPlgPersonas(segments: SalesSegment[]): SalesSegment[] {
+  return segments.map((s) => {
+    if (s.motion !== "plg_self_serve") return s;
+    if (s.example_user_personas?.some((p) => p.label?.trim())) return s;
+    const seed = (s.target_persona || "Example user").split(",")[0]?.trim() || "Example user";
+    return {
+      ...s,
+      example_user_personas: [
+        {
+          label: seed,
+          why_fit: s.why_fit?.slice(0, 160) || "Would try this product on their own",
+          personalization_hook: s.trigger_signal || undefined,
+        },
+      ],
+    };
+  });
+}
+
+const ghostBtn: CSSProperties = {
+  border: "1px solid var(--ink)",
+  background: "transparent",
+  padding: "0.4rem 0.75rem",
+  cursor: "pointer",
+  fontSize: 12,
+};
+
 export default function SegmentConfirm({ sessionDbId, onConfirmed }: SegmentConfirmProps) {
   const [segments, setSegments] = useState<SalesSegment[]>([]);
   const [source, setSource] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const [busyMode, setBusyMode] = useState<"load" | "refresh" | "confirm" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmedAt, setConfirmedAt] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setBusy(true);
+    setBusyMode("load");
     setError(null);
     try {
       const res = await fetch(`/api/sales/segments?session_id=${sessionDbId}`);
@@ -26,11 +56,12 @@ export default function SegmentConfirm({ sessionDbId, onConfirmed }: SegmentConf
         setError(json.error ?? "Could not load segments");
         return;
       }
-      setSegments(json.segments ?? []);
+      setSegments(seedPlgPersonas(json.segments ?? []));
       setSource(json.source ?? "");
       setConfirmedAt(json.confirmed_at ?? null);
     } finally {
       setBusy(false);
+      setBusyMode(null);
     }
   }, [sessionDbId]);
 
@@ -82,6 +113,77 @@ export default function SegmentConfirm({ sessionDbId, onConfirmed }: SegmentConf
     );
   }
 
+  function updatePersona(
+    segIndex: number,
+    personaIndex: number,
+    patch: Partial<{ label: string; why_fit: string; personalization_hook: string }>,
+  ) {
+    setSegments((prev) =>
+      prev.map((s, i) => {
+        if (i !== segIndex) return s;
+        const personas = [...(s.example_user_personas ?? [])];
+        personas[personaIndex] = { ...personas[personaIndex], ...patch };
+        return { ...s, example_user_personas: personas };
+      }),
+    );
+  }
+
+  function addPersona(segIndex: number) {
+    setSegments((prev) =>
+      prev.map((s, i) => {
+        if (i !== segIndex) return s;
+        const seed = (s.target_persona || "Example user").split(",")[0]?.trim() || "Example user";
+        return {
+          ...s,
+          example_user_personas: [
+            ...(s.example_user_personas ?? []),
+            {
+              label: seed,
+              why_fit: s.why_fit?.slice(0, 160) || "Would try this product on their own",
+              personalization_hook: s.trigger_signal || undefined,
+            },
+          ],
+        };
+      }),
+    );
+  }
+
+  function removePersona(segIndex: number, personaIndex: number) {
+    setSegments((prev) =>
+      prev.map((s, i) =>
+        i === segIndex
+          ? {
+              ...s,
+              example_user_personas: (s.example_user_personas ?? []).filter((_, j) => j !== personaIndex),
+            }
+          : s,
+      ),
+    );
+  }
+
+  function setMotion(index: number, motion: SalesSegment["motion"]) {
+    setSegments((prev) =>
+      prev.map((s, i) => {
+        if (i !== index) return s;
+        if (motion === "plg_self_serve" && (!s.example_user_personas || s.example_user_personas.length < 1)) {
+          const seed = (s.target_persona || "Example user").split(",")[0]?.trim() || "Example user";
+          return {
+            ...s,
+            motion,
+            example_user_personas: [
+              {
+                label: seed,
+                why_fit: s.why_fit?.slice(0, 160) || "Would try this product on their own",
+                personalization_hook: s.trigger_signal || undefined,
+              },
+            ],
+          };
+        }
+        return { ...s, motion };
+      }),
+    );
+  }
+
   function removeSegment(index: number) {
     setSegments((prev) => prev.filter((_, i) => i !== index));
   }
@@ -106,18 +208,21 @@ export default function SegmentConfirm({ sessionDbId, onConfirmed }: SegmentConf
   }
 
   async function confirm() {
-    const validationError = validateSegmentsForConfirm(segments);
+    const seeded = seedPlgPersonas(segments);
+    setSegments(seeded);
+    const validationError = validateSegmentsForConfirm(seeded);
     if (validationError) {
       setError(validationError);
       return;
     }
     setBusy(true);
+    setBusyMode("confirm");
     setError(null);
     try {
       const res = await fetch("/api/sales/segments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionDbId, action: "confirm", segments }),
+        body: JSON.stringify({ session_id: sessionDbId, action: "confirm", segments: seeded }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -125,14 +230,16 @@ export default function SegmentConfirm({ sessionDbId, onConfirmed }: SegmentConf
         return;
       }
       setConfirmedAt(json.confirmed_at);
-      onConfirmed(json.segments ?? segments);
+      onConfirmed(json.segments ?? seeded);
     } finally {
       setBusy(false);
+      setBusyMode(null);
     }
   }
 
   async function rederive() {
     setBusy(true);
+    setBusyMode("refresh");
     setError(null);
     try {
       const res = await fetch("/api/sales/segments", {
@@ -145,192 +252,224 @@ export default function SegmentConfirm({ sessionDbId, onConfirmed }: SegmentConf
         setError(json.error ?? "Could not re-derive segments");
         return;
       }
-      setSegments(json.segments ?? []);
+      setSegments(seedPlgPersonas(json.segments ?? []));
       setSource(json.source ?? "");
       setConfirmedAt(null);
     } finally {
       setBusy(false);
+      setBusyMode(null);
     }
   }
 
+  const busyTitle =
+    busyMode === "refresh"
+      ? "Asking Hermes for segments"
+      : busyMode === "confirm"
+        ? "Saving ICP"
+        : "Loading segments";
+
+  const busyStages =
+    busyMode === "refresh"
+      ? [
+          "Reading Overview dossier…",
+          "Hermes drafting buyer segments…",
+          "Checking PLG vs B2B motions…",
+        ]
+      : busyMode === "load"
+        ? ["Loading campaign…", "Deriving segments if needed…"]
+        : ["Validating…", "Persisting confirmed ICP…"];
+
   return (
-    <div className="kraft-card" style={{ padding: "var(--stack-md)", marginBottom: "var(--stack-md)" }}>
-      <p className="label-caps" style={{ marginBottom: "var(--stack-sm)" }}>
-        Confirm who you&apos;re selling to
-      </p>
-      <p className="sales-intro" style={{ marginBottom: "var(--stack-md)" }}>
-        These are the customer segments Kami will research. Edit or remove anything that doesn&apos;t
-        fit — discovery stays locked until you confirm. B2B segments need at least one real company
-        domain seed. PLG segments need an example user persona (not email blast lists).
+    <div className="sales-panel" style={{ position: "relative", paddingTop: "var(--stack-md)" }}>
+      {busy && <SalesBusyOverlay title={busyTitle} stages={busyStages} />}
+
+      <h3 style={{ marginBottom: "var(--stack-sm)" }}>Confirm who you&apos;re selling to</h3>
+      <p className="sales-intro">
+        Edit anything that looks wrong. B2B needs seed company domains for Find. PLG needs an example
+        user (who would try the product themselves — not a company email list).
       </p>
 
       {source && (
-        <p className="mono" style={{ fontSize: 11, color: "var(--ink-soft)", marginBottom: "var(--stack-sm)" }}>
+        <p className="mono" style={{ fontSize: 12, color: "var(--ink-soft)", marginBottom: "var(--stack-md)" }}>
           Source: {source}
           {confirmedAt ? ` · confirmed ${new Date(confirmedAt).toLocaleString()}` : " · not confirmed yet"}
         </p>
       )}
 
       {error && (
-        <p className="mono" style={{ color: "var(--hanko)", fontSize: 13, marginBottom: "var(--stack-sm)" }}>
+        <p className="mono" style={{ color: "var(--hanko)", fontSize: 13, marginBottom: "var(--stack-md)" }}>
           {error}
         </p>
       )}
 
       {!segments.length && !busy && (
-        <p className="mono" style={{ color: "var(--ink-soft)", fontSize: 13 }}>
-          No segments yet — click Refresh to derive from your dossier.
+        <p className="mono" style={{ color: "var(--ink-soft)", fontSize: 13, marginBottom: "var(--stack-md)" }}>
+          No segments yet — click Refresh from dossier.
         </p>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--stack-sm)" }}>
+      <div className="sales-segment-list">
         {segments.map((seg, i) => (
-          <div key={seg.key} style={{ border: "1px solid var(--outline-variant)", padding: "var(--stack-sm)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap" }}>
-              <input
-                value={seg.name}
-                onChange={(e) => updateSegment(i, { name: e.target.value })}
-                style={{ flex: 1, minWidth: 160, fontWeight: 600 }}
-              />
-              <select
-                value={seg.motion}
-                onChange={(e) =>
-                  updateSegment(i, {
-                    motion: e.target.value as SalesSegment["motion"],
-                  })
-                }
-                className="mono"
-                style={{ fontSize: 12 }}
-              >
-                <option value="b2b_sales_assisted">B2B sales-assisted</option>
-                <option value="plg_self_serve">PLG / self-serve</option>
-              </select>
-              <button
-                type="button"
-                className="mono"
-                onClick={() => removeSegment(i)}
-                style={{ border: "1px solid var(--outline)", background: "transparent", fontSize: 11, cursor: "pointer" }}
-              >
+          <section key={seg.key} className="sales-segment">
+            <div className="sales-segment-head">
+              <div className="form-line" style={{ flex: 1, minWidth: 200, marginBottom: 0 }}>
+                <label className="mono label-caps" htmlFor={`seg-name-${seg.key}`}>
+                  Segment {i + 1}
+                </label>
+                <input
+                  id={`seg-name-${seg.key}`}
+                  value={seg.name}
+                  onChange={(e) => updateSegment(i, { name: e.target.value })}
+                />
+              </div>
+              <div className="form-line" style={{ width: 200, marginBottom: 0 }}>
+                <label className="mono label-caps" htmlFor={`seg-motion-${seg.key}`}>
+                  Motion
+                </label>
+                <select
+                  id={`seg-motion-${seg.key}`}
+                  value={seg.motion}
+                  onChange={(e) => setMotion(i, e.target.value as SalesSegment["motion"])}
+                  className="sales-select"
+                >
+                  <option value="b2b_sales_assisted">B2B — email companies</option>
+                  <option value="plg_self_serve">PLG — individual users</option>
+                </select>
+              </div>
+              <button type="button" className="mono" onClick={() => removeSegment(i)} style={{ ...ghostBtn, alignSelf: "flex-end" }}>
                 Remove
               </button>
             </div>
-            <p className="mono" style={{ fontSize: 11, color: "var(--ink-soft)", marginTop: "0.35rem" }}>
-              Why they&apos;d buy this product
-            </p>
-            <textarea
-              value={seg.why_fit}
-              onChange={(e) => updateSegment(i, { why_fit: e.target.value })}
-              rows={2}
-              style={{ width: "100%", fontSize: 13 }}
-            />
-            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "0.35rem" }}>
-              <label className="mono" style={{ fontSize: 11, flex: 1, minWidth: 140 }}>
-                Who to contact
+
+            <div className="form-line" style={{ marginTop: "var(--stack-sm)" }}>
+              <label className="mono label-caps" htmlFor={`seg-why-${seg.key}`}>
+                Why they&apos;d buy
+              </label>
+              <textarea
+                id={`seg-why-${seg.key}`}
+                className="sales-textarea"
+                rows={2}
+                value={seg.why_fit}
+                onChange={(e) => updateSegment(i, { why_fit: e.target.value })}
+              />
+            </div>
+
+            <div className="sales-segment-grid">
+              <div className="form-line">
+                <label className="mono label-caps" htmlFor={`seg-who-${seg.key}`}>
+                  Who to contact
+                </label>
                 <input
+                  id={`seg-who-${seg.key}`}
                   value={seg.target_persona}
                   onChange={(e) => updateSegment(i, { target_persona: e.target.value })}
-                  style={{ display: "block", width: "100%", marginTop: 2 }}
                 />
-              </label>
-              <label className="mono" style={{ fontSize: 11, width: 80 }}>
-                Budget
+              </div>
+              <div className="form-line" style={{ maxWidth: 100 }}>
+                <label className="mono label-caps" htmlFor={`seg-budget-${seg.key}`}>
+                  Budget
+                </label>
                 <input
+                  id={`seg-budget-${seg.key}`}
                   type="number"
                   min={1}
                   max={20}
                   value={seg.target_count}
                   onChange={(e) => updateSegment(i, { target_count: Number(e.target.value) || 1 })}
-                  style={{ display: "block", width: "100%", marginTop: 2 }}
                 />
-              </label>
-              <label className="mono" style={{ fontSize: 11, flex: 1, minWidth: 140 }}>
-                Trigger signal
+              </div>
+              <div className="form-line">
+                <label className="mono label-caps" htmlFor={`seg-trigger-${seg.key}`}>
+                  Trigger signal
+                </label>
                 <input
+                  id={`seg-trigger-${seg.key}`}
                   value={seg.trigger_signal}
                   onChange={(e) => updateSegment(i, { trigger_signal: e.target.value })}
-                  style={{ display: "block", width: "100%", marginTop: 2 }}
-                  placeholder="e.g. hiring AI eng, launched agent product"
+                  placeholder="e.g. posting about broken extensions"
                 />
-              </label>
+              </div>
             </div>
 
             {seg.motion === "b2b_sales_assisted" && (
-              <div style={{ marginTop: "0.5rem" }}>
-                <p className="mono" style={{ fontSize: 11, color: "var(--ink-soft)" }}>
-                  Seed companies (editable — required for Find)
+              <div style={{ marginTop: "var(--stack-sm)" }}>
+                <p className="label-caps" style={{ marginBottom: "var(--stack-sm)" }}>
+                  Seed companies
+                </p>
+                <p className="mono" style={{ fontSize: 12, color: "var(--ink-soft)", marginBottom: "var(--stack-sm)" }}>
+                  Real domains Kami will verify in Find. Required for B2B.
                 </p>
                 {(seg.candidate_companies ?? []).map((c, ci) => (
-                  <div
-                    key={`${seg.key}-c-${ci}`}
-                    style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", marginTop: 4 }}
-                  >
+                  <div key={`${seg.key}-c-${ci}`} className="sales-segment-row">
                     <input
-                      placeholder="Name"
+                      placeholder="Company"
                       value={c.name}
                       onChange={(e) => updateCandidate(i, ci, { name: e.target.value })}
-                      style={{ flex: 1, minWidth: 100, fontSize: 12 }}
                     />
                     <input
                       placeholder="domain.com"
                       value={c.domain}
                       onChange={(e) => updateCandidate(i, ci, { domain: e.target.value })}
-                      style={{ flex: 1, minWidth: 120, fontSize: 12 }}
                     />
                     <input
-                      placeholder="Why fit"
+                      placeholder="Why they fit"
                       value={c.why ?? ""}
                       onChange={(e) => updateCandidate(i, ci, { why: e.target.value })}
-                      style={{ flex: 1.5, minWidth: 140, fontSize: 12 }}
                     />
-                    <button
-                      type="button"
-                      className="mono"
-                      onClick={() => removeCandidate(i, ci)}
-                      style={{ border: "1px solid var(--outline)", background: "transparent", fontSize: 11, cursor: "pointer" }}
-                    >
-                      ×
+                    <button type="button" className="mono" onClick={() => removeCandidate(i, ci)} style={ghostBtn}>
+                      Remove
                     </button>
                   </div>
                 ))}
-                <button
-                  type="button"
-                  className="mono"
-                  onClick={() => addCandidate(i)}
-                  style={{
-                    marginTop: 6,
-                    border: "1px solid var(--outline)",
-                    background: "transparent",
-                    fontSize: 11,
-                    cursor: "pointer",
-                    padding: "0.2rem 0.5rem",
-                  }}
-                >
+                <button type="button" className="mono" onClick={() => addCandidate(i)} style={{ ...ghostBtn, marginTop: "0.5rem" }}>
                   + Add company
                 </button>
               </div>
             )}
 
             {seg.motion === "plg_self_serve" && (
-              <p className="mono" style={{ fontSize: 11, color: "var(--ink-soft)", marginTop: "0.35rem" }}>
-                PLG motion — Find will not blast company emails. Example users:{" "}
-                {seg.example_user_personas?.length
-                  ? seg.example_user_personas.map((p) => p.label).join("; ")
-                  : "(add personas via Refresh or confirm will require at least one)"}
-              </p>
+              <div style={{ marginTop: "var(--stack-sm)" }}>
+                <p className="label-caps" style={{ marginBottom: "var(--stack-sm)" }}>
+                  Example users
+                </p>
+                <p className="mono" style={{ fontSize: 12, color: "var(--ink-soft)", marginBottom: "var(--stack-sm)" }}>
+                  Who would try this themselves? One short description is enough — not a company, not an email.
+                </p>
+                {(seg.example_user_personas ?? []).map((p, pi) => (
+                  <div key={`${seg.key}-p-${pi}`} className="sales-segment-row sales-segment-row--persona">
+                    <input
+                      placeholder="e.g. Indie hacker with 40 Chrome extensions"
+                      value={p.label}
+                      onChange={(e) => updatePersona(i, pi, { label: e.target.value })}
+                    />
+                    <input
+                      placeholder="Why they'd try it"
+                      value={p.why_fit}
+                      onChange={(e) => updatePersona(i, pi, { why_fit: e.target.value })}
+                    />
+                    <button type="button" className="mono" onClick={() => removePersona(i, pi)} style={ghostBtn}>
+                      Remove
+                    </button>
+                  </div>
+                ))}
+                <button type="button" className="mono" onClick={() => addPersona(i)} style={{ ...ghostBtn, marginTop: "0.5rem" }}>
+                  + Add example user
+                </button>
+              </div>
             )}
-          </div>
+          </section>
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: "var(--stack-sm)", marginTop: "var(--stack-md)", flexWrap: "wrap" }}>
-        <button type="button" className="mono" onClick={addSegment} disabled={busy} style={{ border: "1px solid var(--ink)", background: "transparent", padding: "0.4rem 0.75rem", cursor: "pointer" }}>
+      <div style={{ display: "flex", gap: "var(--stack-sm)", marginTop: "var(--stack-lg)", flexWrap: "wrap", alignItems: "center" }}>
+        <button type="button" className="mono" onClick={addSegment} disabled={busy} style={ghostBtn}>
           + Add segment
         </button>
-        <button type="button" className="mono" onClick={rederive} disabled={busy} style={{ border: "1px solid var(--outline)", background: "transparent", padding: "0.4rem 0.75rem", cursor: "pointer" }}>
+        <button type="button" className="mono" onClick={rederive} disabled={busy} style={ghostBtn}>
           Refresh from dossier
         </button>
         <button type="button" className="hanko-btn" onClick={confirm} disabled={busy || !segments.length}>
-          {busy ? "…" : "Confirm segments"}
+          {busy && busyMode === "confirm" ? "Saving…" : "Confirm segments"}
         </button>
       </div>
     </div>

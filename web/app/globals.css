@@ -353,6 +353,93 @@ h3 {
   font-size: 12px;
 }
 
+/* Confirm ICP — align with SalesSetup form language */
+.sales-segment-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-lg);
+}
+
+.sales-segment {
+  padding-bottom: var(--stack-md);
+  border-bottom: 1px solid var(--crease);
+}
+
+.sales-segment:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.sales-segment-head {
+  display: flex;
+  gap: var(--stack-md);
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.sales-segment-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 100px 1.4fr;
+  gap: var(--stack-md);
+  margin-top: var(--stack-sm);
+}
+
+@media (max-width: 720px) {
+  .sales-segment-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sales-select {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  color: var(--ink);
+  padding: 0.4rem 0;
+  outline: none;
+}
+
+.sales-select:focus {
+  border-bottom-color: var(--hanko);
+}
+
+.sales-segment-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.4fr auto;
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 0.65rem;
+}
+
+.sales-segment-row input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--ink);
+  padding: 0.35rem 0;
+  outline: none;
+  min-width: 0;
+}
+
+.sales-segment-row input:focus {
+  border-bottom-color: var(--hanko);
+}
+
+.sales-segment-row--persona {
+  grid-template-columns: 1.2fr 1.4fr auto;
+}
+
+@media (max-width: 720px) {
+  .sales-segment-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Find / Hermes busy overlay */
 .sales-busy {
   position: absolute;

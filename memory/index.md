@@ -6,6 +6,7 @@
 - [CMO shared context (Phase 1 inject + Phase 2 MCP)](./cmo-context.md)
 - [Sales pipeline overhaul (segments + verified discovery)](./sales-pipeline-overhaul.md)
 - [Domain-truth pipeline (exact domain → Overview → Sales)](./domain-truth.md)
+- [Sales ICP confirm UX (align with SalesSetup; PLG personas editable)](./sales-icp-ux.md)
 - [Hermes setup guide (teammate + agent)](../references/hermes-setup-guide.md)
 - [Marketing vertical](./marketing-vertical.md)
 - Research digest / source notes: `references/research-context.md`
