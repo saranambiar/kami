@@ -1,8 +1,12 @@
-# Deploy Kami (trykami.app)
+# Deploy Kami (optional hosted maintainers path)
 
-Lean split:
-- **Vercel** = Next.js UI (`web/`) at `https://trykami.app`
-- **AWS EC2** = Hermes gateway at `https://api.trykami.app`
+> **Community Edition default:** run Kami locally with your own Hermes + Supabase.
+> See [SETUP.md](../SETUP.md) and [docs/community-edition.md](../docs/community-edition.md).
+> This document is only for maintainers who choose to host a public instance.
+
+Lean split (example: trykami.app):
+- **Vercel** = Next.js UI (`web/`)
+- **AWS EC2** = Hermes gateway
 
 Git pipeline:
 - Push `dev` → Vercel Preview

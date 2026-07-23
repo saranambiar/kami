@@ -141,15 +141,18 @@ If something is behind schedule, cut breadth (fewer playbooks/specialists) befor
 
 ---
 
-## 7. Product UX principles (founder Sales flow)
+## 7. Product UX principles (founder GTM flow)
 
-Canonical loops live in [docs/product-loops.md](docs/product-loops.md). When changing Domain → Overview → Sales:
+Canonical loops live in [docs/product-loops.md](docs/product-loops.md). Community Edition is **self-hosted / BYOK** — see [docs/community-edition.md](docs/community-edition.md).
 
-- **Domain-first:** Overview dossier pre-fills Sales; never default to a blank ICP jargon form.
-- **One job per screen:** one primary Hanko-red CTA; progressive disclosure (Confirm → Plan → Find → Emails → Needs you).
-- **Recommend → confirm → act → escalate:** NL confirm after dossier; explicit Find companies; hybrid send; kill switch always visible.
+When changing Domain → Overview → Sales / Marketing:
+
+- **Domain-first:** confirm the dossier (**That’s us**) before GTM choices; never start with a blank ICP jargon form.
+- **Two jobs:** Find customers (Sales) or Create distribution (Marketing). One primary Hanko-red CTA per screen.
+- **Recommend → confirm → act → learn → escalate:** small batches; hybrid send; kill switch always visible in the shell.
 - **Never invent emails:** block send until a real contact email exists on the account.
-- Sales consumes Overview dossier only; Marketing tab is a separate vertical.
+- **Marketing CRM / cold DMs** are a later Advanced feature — default Marketing is the distribution opportunity queue.
+- **Kami Guide** (formerly CMO) is persistent across tabs with a fresh context pack every turn.
 
 ---
 

@@ -1,0 +1,13 @@
+{
+  "name": "kami",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Kami Community Edition — self-hosted AI GTM agency",
+  "scripts": {
+    "dev": "npm --prefix web run dev",
+    "build": "npm --prefix web run build",
+    "eval:sales": "npm --prefix web run eval:sales",
+    "readiness": "node scripts/readiness.mjs",
+    "sync:skills": "node scripts/sync-hermes-skills.mjs"
+  }
+}
