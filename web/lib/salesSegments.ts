@@ -235,6 +235,7 @@ export async function deriveSalesSegments(params: {
   domain: string;
   dossier: Dossier | null;
   hermesSessionId?: string;
+  kamiSessionId?: string | null;
   goals?: string[];
 }): Promise<SegmentsPayload> {
   const fallback = segmentsFromDossier(params.dossier, params.domain);
@@ -250,6 +251,9 @@ export async function deriveSalesSegments(params: {
   const text = await hermesChatOnce({
     content: segmentPrompt(params.domain, params.dossier, params.goals ?? []),
     sessionId: params.hermesSessionId ?? `kami-segments-${params.domain}`,
+    kamiSessionId: params.kamiSessionId,
+    kind: "sales_segments",
+    agent: "icp_segmentation",
     timeoutMs: 90_000,
   });
 

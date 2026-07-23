@@ -69,7 +69,7 @@ export async function POST(request: Request): Promise<Response> {
       continue;
     }
 
-    const contact = await findContactForDomain(acc.domain, acc.name);
+    const contact = await findContactForDomain(acc.domain, acc.name, session_id);
     if (!contact?.email) {
       results.push({ account_id: acc.id, domain: acc.domain, status: "not_found" });
       continue;

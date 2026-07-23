@@ -66,7 +66,12 @@ export async function GET(request: Request): Promise<Response> {
   const { dossier, domain, goals } = await loadSessionContext(sessionId);
   if (!domain) return Response.json({ error: "session domain not found" }, { status: 400 });
 
-  const derived = await deriveSalesSegments({ domain, dossier, goals });
+  const derived = await deriveSalesSegments({
+    domain,
+    dossier,
+    goals,
+    kamiSessionId: sessionId,
+  });
   return Response.json({
     segments: derived.segments,
     confirmed_at: null,
@@ -100,7 +105,12 @@ export async function POST(request: Request): Promise<Response> {
   if (action === "derive") {
     const { dossier, domain, goals } = await loadSessionContext(session_id);
     if (!domain) return Response.json({ error: "session domain not found" }, { status: 400 });
-    const derived = await deriveSalesSegments({ domain, dossier, goals });
+    const derived = await deriveSalesSegments({
+      domain,
+      dossier,
+      goals,
+      kamiSessionId: session_id,
+    });
     return Response.json({
       segments: derived.segments,
       confirmed_at: null,

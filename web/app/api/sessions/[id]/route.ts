@@ -1,3 +1,4 @@
+import { logAgentRunAsync } from "@/lib/agentRunLog";
 import { supabaseServer } from "@/lib/supabase";
 import type { Dossier } from "@/lib/hermes";
 
@@ -98,6 +99,15 @@ export async function PATCH(
           );
         }
         await sb.from("agent_sessions").update({ status: "done" }).eq("id", id);
+        logAgentRunAsync({
+          sessionId: id,
+          source: "pipeline",
+          kind: "dossier_persist",
+          agent: "onboarding",
+          status: "ok",
+          outputJson: d,
+          outputText: `${d.company} — ${d.positioning}`,
+        });
         break;
       }
       case "activity":

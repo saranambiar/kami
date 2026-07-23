@@ -34,20 +34,32 @@ export function newSessionId(): string {
   return `kami-ui-${Date.now()}`;
 }
 
+export interface StreamChatOptions {
+  /** Supabase agent_sessions.id for agent_run_logs */
+  kamiSessionId?: string | null;
+  kind?: string;
+  agent?: string;
+}
+
 /**
  * POST a message to the Hermes gateway via /api/chat and stream the
  * assistant text back through onDelta. Returns the full text.
+ * Server logs the completed stream into Supabase `agent_run_logs`.
  */
 export async function streamChat(
   content: string,
   sessionId: string,
   onDelta: (text: string) => void,
+  options?: StreamChatOptions,
 ): Promise<string> {
   const res = await fetch("/api/chat", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Hermes-Session-Id": sessionId,
+      ...(options?.kamiSessionId ? { "X-Kami-Session-Id": options.kamiSessionId } : {}),
+      ...(options?.kind ? { "X-Kami-Run-Kind": options.kind } : {}),
+      ...(options?.agent ? { "X-Kami-Agent": options.agent } : {}),
     },
     body: JSON.stringify({
       model: "gpt-5.4",

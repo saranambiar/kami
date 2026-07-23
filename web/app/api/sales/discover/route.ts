@@ -1,3 +1,4 @@
+import { logAgentRunAsync } from "@/lib/agentRunLog";
 import { supabaseServer } from "@/lib/supabase";
 import { researchFromSegments } from "@/lib/salesResearch";
 import type { SalesSegment } from "@/lib/salesSegments";
@@ -73,6 +74,7 @@ export async function POST(request: Request): Promise<Response> {
     offerDomain,
     segments,
     exclusions: campaign.exclusions ?? [],
+    kamiSessionId: session_id,
   });
 
   // Traceable discovery run — re-runs attach signals/scores to this id (dedupe below).
@@ -97,6 +99,19 @@ export async function POST(request: Request): Promise<Response> {
   const discoveryRunId = runRow?.id as string | undefined;
 
   if (!researched.accounts.length) {
+    logAgentRunAsync({
+      sessionId: session_id,
+      source: "pipeline",
+      kind: "sales_discover",
+      agent: "discovery",
+      status: "ok",
+      outputJson: {
+        count: 0,
+        warnings: researched.warnings,
+        discovery_run_id: discoveryRunId ?? null,
+      },
+      outputText: researched.warnings.join("\n") || "No verifiable companies found",
+    });
     return Response.json({
       discovered: true,
       count: 0,
@@ -307,6 +322,23 @@ export async function POST(request: Request): Promise<Response> {
       source: "segments_verified_signals",
       warnings: researched.warnings,
     },
+  });
+
+  logAgentRunAsync({
+    sessionId: session_id,
+    source: "pipeline",
+    kind: "sales_discover",
+    agent: "discovery",
+    status: "ok",
+    outputJson: {
+      count: created.length,
+      accounts: created,
+      warnings: researched.warnings,
+      discovery_run_id: discoveryRunId ?? null,
+    },
+    outputText: created
+      .map((a) => `${a.name} (${a.domain})${a.email ? ` · ${a.email}` : ""}`)
+      .join("\n"),
   });
 
   return Response.json({

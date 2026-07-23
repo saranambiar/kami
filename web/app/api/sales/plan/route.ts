@@ -168,6 +168,7 @@ export async function POST(request: Request): Promise<Response> {
       version: nextVersion,
       segments,
       goals,
+      kamiSessionId: session_id,
       hermesSessionId:
         typeof session?.data?.hermes_session_id === "string"
           ? `kami-sales-plan-${session.data.hermes_session_id}`

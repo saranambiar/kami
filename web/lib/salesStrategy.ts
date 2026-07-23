@@ -239,6 +239,7 @@ export async function generateSalesStrategy(params: {
   segments?: SalesSegment[] | null;
   goals?: string[];
   hermesSessionId?: string;
+  kamiSessionId?: string | null;
 }): Promise<StrategistResult> {
   const segments = params.segments ?? null;
   const goals = params.goals ?? [];
@@ -284,6 +285,9 @@ export async function generateSalesStrategy(params: {
       goals,
     }),
     sessionId: params.hermesSessionId ?? `kami-sales-plan-${params.domain}`,
+    kamiSessionId: params.kamiSessionId,
+    kind: "sales_plan",
+    agent: "sales_strategist",
     timeoutMs: 90_000,
   });
 

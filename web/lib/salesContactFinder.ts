@@ -125,6 +125,7 @@ async function findContactViaHermes(
   domain: string,
   companyName: string | undefined,
   evidenceBlob: string,
+  kamiSessionId?: string | null,
 ): Promise<FoundContact | null> {
   if (!hermesGatewayConfigured()) return null;
   const host = domain.toLowerCase().replace(/^www\./, "");
@@ -153,7 +154,11 @@ Output ONLY a fenced json block:
   const text = await hermesChatOnce({
     content: prompt,
     sessionId: `kami-contact-${host}`,
+    kamiSessionId,
+    kind: "contact_find",
+    agent: "contact_finder",
     timeoutMs: 60_000,
+    meta: { domain: host },
   });
   if (!text) return null;
 
@@ -184,6 +189,7 @@ Output ONLY a fenced json block:
 export async function findContactForDomain(
   domain: string,
   companyName?: string,
+  kamiSessionId?: string | null,
 ): Promise<FoundContact | null> {
   const host = domain.toLowerCase().replace(/^www\./, "");
   if (!host.includes(".")) return null;
@@ -231,7 +237,7 @@ export async function findContactForDomain(
   }
 
   if (evidenceBlob) {
-    const hermesHit = await findContactViaHermes(host, companyName, evidenceBlob);
+    const hermesHit = await findContactViaHermes(host, companyName, evidenceBlob, kamiSessionId);
     if (hermesHit) return hermesHit;
   } else if (hermesGatewayConfigured()) {
     // Minimal evidence: homepage text only
@@ -241,6 +247,7 @@ export async function findContactForDomain(
         host,
         companyName,
         `Homepage excerpt:\n${html.slice(0, 4000)}`,
+        kamiSessionId,
       );
       if (hermesHit) return hermesHit;
     }

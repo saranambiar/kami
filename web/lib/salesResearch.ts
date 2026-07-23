@@ -41,6 +41,7 @@ export interface ResearchFromSegmentsParams {
   offerDomain: string;
   segments: SalesSegment[];
   exclusions?: string[];
+  kamiSessionId?: string | null;
 }
 
 export interface ResearchFromSegmentsResult {
@@ -331,7 +332,7 @@ function signalAgeDays(signals: ResearchedSignal[], capturedAt: string): number 
 export async function researchFromSegments(
   params: ResearchFromSegmentsParams,
 ): Promise<ResearchFromSegmentsResult> {
-  const { offerDomain, segments, exclusions = [] } = params;
+  const { offerDomain, segments, exclusions = [], kamiSessionId } = params;
   const offerHost = normalizeCompanyDomain(offerDomain);
   const capturedAt = new Date().toISOString();
   const warnings: string[] = [];
@@ -367,6 +368,7 @@ export async function researchFromSegments(
       const contact = await findContactForDomain(
         domain,
         candidate.name || companyNameFromDomain(domain),
+        kamiSessionId,
       );
       const hasContact = Boolean(contact?.email);
 
