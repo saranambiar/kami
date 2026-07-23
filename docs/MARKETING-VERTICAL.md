@@ -1,11 +1,15 @@
 # Marketing Vertical — Codebase Overview
 
-> Living doc. Updated post-merge to `dev` (Phase 0 fixes).
-> Last updated: 2026-07-18
+> Living doc. Updated 2026-07-23 for Community MVP.
+>
+> **Primary product loop** = distribution opportunities ([product-loops.md](product-loops.md)).
+> **X/IG CRM + cold DMs** below = preserved as a **later Advanced feature** (do not delete;
+> keep on a later CRM feature branch / behind Advanced UI). Not the default founder journey.
 
-## Status: Merged to `dev`, Phase 0 fixes applied
+## Status: Distribution queue is MVP; CRM is Advanced / later
 
 ---
+
 
 ## Session ID rule
 
