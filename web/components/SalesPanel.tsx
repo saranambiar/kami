@@ -37,6 +37,8 @@ interface SalesPanelProps {
   goals?: string[];
   focusStep?: SalesGuidedStep | null;
   onSetup: (config: SalesCampaignConfig) => void;
+  /** Route PLG/D2C founders to Marketing distribution. */
+  onCreateDistribution?: () => void;
 }
 
 function defaultOpsStep(config: SalesCampaignConfig | null, plan: SalesPlan | null): OpsStep {
@@ -53,8 +55,11 @@ export default function SalesPanel({
   goals,
   focusStep,
   onSetup,
+  onCreateDistribution,
 }: SalesPanelProps) {
   const [plan, setPlan] = useState<SalesPlan | null>(null);
+  const [planSource, setPlanSource] = useState<"hermes" | "offline_fallback" | "client" | null>(null);
+  const [planNote, setPlanNote] = useState<string | null>(null);
   const [segments, setSegments] = useState<SalesSegment[] | null>(
     (config?.segments as SalesSegment[] | null) ?? null,
   );
@@ -152,8 +157,11 @@ export default function SalesPanel({
         body: JSON.stringify({ session_id: sessionDbId }),
       });
       const json = await res.json();
-      if (res.ok && json.plan) setPlan(json.plan);
-      else fetchPlan();
+      if (res.ok && json.plan) {
+        setPlan(json.plan);
+        setPlanSource(json.source ?? null);
+        setPlanNote(json.note ?? null);
+      } else fetchPlan();
     }
     setStep("plan");
   }
@@ -299,11 +307,17 @@ export default function SalesPanel({
           plan={plan}
           offer={config.offer}
           segments={segments}
+          planSource={planSource}
+          planNote={planNote}
           onApproved={(p) => {
             setPlan(p);
             setStep("find");
           }}
-          onRevised={setPlan}
+          onRevised={(p, meta) => {
+            setPlan(p);
+            if (meta?.source) setPlanSource(meta.source);
+            if (meta?.note !== undefined) setPlanNote(meta.note ?? null);
+          }}
         />
       )}
 
@@ -318,6 +332,7 @@ export default function SalesPanel({
             setSequencesCreated(true);
             setStep("emails");
           }}
+          onCreateDistribution={onCreateDistribution}
         />
       )}
 

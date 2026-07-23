@@ -35,6 +35,7 @@ interface SalesTargetReviewProps {
   segments?: SalesSegment[] | null;
   paused?: boolean;
   onContinue?: () => void;
+  onCreateDistribution?: () => void;
 }
 
 function isIncluded(account: SalesAccount): boolean {
@@ -51,6 +52,7 @@ export default function SalesTargetReview({
   segments,
   paused,
   onContinue,
+  onCreateDistribution,
 }: SalesTargetReviewProps) {
   const [accounts, setAccounts] = useState<AccountWithMeta[]>([]);
   const [busy, setBusy] = useState(false);
@@ -63,6 +65,30 @@ export default function SalesTargetReview({
   const [savingEmailId, setSavingEmailId] = useState<string | null>(null);
 
   const planApproved = plan?.status === "approved";
+
+  const plgOnly = useMemo(() => {
+    const segs = segments ?? [];
+    if (!segs.length) return false;
+    return segs.every(
+      (s) =>
+        s.motion === "plg_self_serve" &&
+        (!s.candidate_companies || s.candidate_companies.length === 0),
+    );
+  }, [segments]);
+
+  const hasB2bSeeds = useMemo(() => {
+    const segs = segments ?? [];
+    return segs.some(
+      (s) => s.motion !== "plg_self_serve" || (s.candidate_companies?.length ?? 0) > 0,
+    );
+  }, [segments]);
+
+  const plgWarningsOnly = useMemo(() => {
+    if (accounts.length > 0 || !warnings.length) return false;
+    return warnings.every((w) => /plg|individual|self[- ]?serve|not a company|consumer/i.test(w));
+  }, [accounts.length, warnings]);
+
+  const distributionPath = plgOnly || plgWarningsOnly;
 
   const fetchAccounts = useCallback(async () => {
     if (!sessionDbId) return;
@@ -370,10 +396,23 @@ export default function SalesTargetReview({
 
       <SalesFunnel segments={segments} plan={plan} accounts={accounts} />
 
-      <p className="sales-intro" style={{ marginBottom: "var(--stack-md)" }}>
-        We verify named companies from your segments, look up public emails (site → Linkup → Hermes),
-        and score Fit × Timing. Check Include, then continue.
-      </p>
+      {distributionPath ? (
+        <div style={{ marginBottom: "var(--stack-md)" }}>
+          <p className="sales-intro" style={{ marginBottom: "var(--stack-sm)" }}>
+            These segments are individual buyers/users, not companies to email-blast. Company Find
+            does not apply — we will not invent consumer emails.
+          </p>
+          <p className="mono" style={{ fontSize: 12, color: "var(--ink-soft)" }}>
+            Next step: create a distribution campaign (X, Reddit, etc.) so the right people find you.
+            If you also have B2B seed companies, add them under Confirm ICP and use Find companies.
+          </p>
+        </div>
+      ) : (
+        <p className="sales-intro" style={{ marginBottom: "var(--stack-md)" }}>
+          We verify named companies from your segments, look up public emails (site → Linkup → Hermes),
+          and score Fit × Timing. Check Include, then continue.
+        </p>
+      )}
 
       <div
         style={{
@@ -385,32 +424,46 @@ export default function SalesTargetReview({
           gap: "var(--stack-sm)",
         }}
       >
-        <p className="label-caps">Find companies</p>
+        <p className="label-caps">{distributionPath ? "Find people to reach" : "Find companies"}</p>
         <div style={{ display: "flex", gap: "var(--stack-sm)", flexWrap: "wrap" }}>
-          <button
-            type="button"
-            className="hanko-btn"
-            onClick={runDiscovery}
-            disabled={busy || paused}
-            style={{ opacity: paused ? 0.5 : 1 }}
-          >
-            {busy && busyMode === "discover" ? "Finding…" : "Find companies"}
-          </button>
-          <button
-            type="button"
-            className="mono"
-            onClick={findEmailsWithHermes}
-            disabled={busy || paused || !accounts.length}
-            style={{
-              border: "1px solid var(--ink)",
-              background: "transparent",
-              padding: "0.4rem 0.75rem",
-              cursor: busy || paused || !accounts.length ? "not-allowed" : "pointer",
-            }}
-            title="Scrape + Linkup + Hermes — never invents emails"
-          >
-            {busy && busyMode === "emails" ? "Looking up…" : "Find emails with Hermes"}
-          </button>
+          {hasB2bSeeds && (
+            <button
+              type="button"
+              className="hanko-btn"
+              onClick={runDiscovery}
+              disabled={busy || paused}
+              style={{ opacity: paused ? 0.5 : 1 }}
+            >
+              {busy && busyMode === "discover" ? "Finding…" : "Find companies"}
+            </button>
+          )}
+          {distributionPath && onCreateDistribution && (
+            <button type="button" className="hanko-btn" onClick={onCreateDistribution}>
+              Create distribution
+            </button>
+          )}
+          {!distributionPath && (
+            <button
+              type="button"
+              className="mono"
+              onClick={findEmailsWithHermes}
+              disabled={busy || paused || !accounts.length}
+              style={{
+                border: "1px solid var(--ink)",
+                background: "transparent",
+                padding: "0.4rem 0.75rem",
+                cursor: busy || paused || !accounts.length ? "not-allowed" : "pointer",
+                opacity: accounts.length ? 1 : 0.5,
+              }}
+              title={
+                accounts.length
+                  ? "Scrape + Linkup + Hermes — never invents emails"
+                  : "Available after companies are listed"
+              }
+            >
+              {busy && busyMode === "emails" ? "Looking up…" : "Find emails with Hermes"}
+            </button>
+          )}
           {includedCount > 0 && (
             <button
               type="button"
@@ -429,6 +482,11 @@ export default function SalesTargetReview({
           )}
         </div>
       </div>
+      {!distributionPath && !accounts.length && (
+        <p className="mono" style={{ fontSize: 11, color: "var(--ink-soft)", marginBottom: "var(--stack-sm)" }}>
+          Find emails with Hermes is available after companies are listed.
+        </p>
+      )}
       <hr className="crease" />
 
       {emailBanner && (

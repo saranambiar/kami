@@ -42,17 +42,12 @@ export default function SalesSetup({
   const [whatSentence, setWhatSentence] = useState(initial.whatSentence);
   const [targetQty, setTargetQty] = useState(initial.targetQty);
   const [showDetails, setShowDetails] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [icpTitles, setIcpTitles] = useState(initial.icpTitles);
   const [icpIndustries, setIcpIndustries] = useState(initial.icpIndustries);
   const [geo, setGeo] = useState(initial.geo);
   const [exclusions, setExclusions] = useState("");
-  const [dealMin, setDealMin] = useState("");
-  const [dealMax, setDealMax] = useState("");
   const [dailyCap, setDailyCap] = useState(existingConfig?.daily_send_cap ?? 35);
-  const [senderName, setSenderName] = useState(existingConfig?.sender_identity?.name ?? "");
-  const [senderEmail, setSenderEmail] = useState(existingConfig?.sender_identity?.email ?? "");
-  const [autoFollowups, setAutoFollowups] = useState(existingConfig?.autonomy?.auto_followups ?? true);
+  const [autoFollowups, setAutoFollowups] = useState(existingConfig?.autonomy?.auto_followups ?? false);
   const [requireFirstSendApproval, setRequireFirstSendApproval] = useState(
     existingConfig?.autonomy?.require_first_send_approval ?? true,
   );
@@ -85,11 +80,11 @@ export default function SalesSetup({
 
     const payload = nlPrefillToConfig(sessionDbId, prefill, {
       exclusions,
-      dealMin,
-      dealMax,
+      dealMin: existingConfig?.deal_range?.min != null ? String(existingConfig.deal_range.min) : "",
+      dealMax: existingConfig?.deal_range?.max != null ? String(existingConfig.deal_range.max) : "",
       dailyCap,
-      senderName,
-      senderEmail,
+      senderName: existingConfig?.sender_identity?.name ?? "",
+      senderEmail: existingConfig?.sender_identity?.email ?? "",
       autoFollowups,
       requireFirstSendApproval,
       channels,
@@ -207,40 +202,15 @@ export default function SalesSetup({
           <div className="form-line" style={{ marginBottom: "var(--stack-sm)" }}>
             <label className="mono label-caps" htmlFor="exclusions">Exclusions (one per line)</label>
             <textarea id="exclusions" className="sales-textarea" rows={2} value={exclusions} onChange={(e) => setExclusions(e.target.value)} />
+            <p className="mono" style={{ fontSize: 11, color: "var(--ink-soft)", marginTop: 4 }}>
+              Domains or company names to skip during Find.
+            </p>
           </div>
-          <div style={{ display: "flex", gap: "var(--stack-md)", flexWrap: "wrap", marginBottom: "var(--stack-sm)" }}>
-            <div className="form-line" style={{ flex: 1, minWidth: 100 }}>
-              <label className="mono label-caps" htmlFor="deal-min">Deal min ($)</label>
-              <input id="deal-min" type="number" value={dealMin} onChange={(e) => setDealMin(e.target.value)} />
-            </div>
-            <div className="form-line" style={{ flex: 1, minWidth: 100 }}>
-              <label className="mono label-caps" htmlFor="deal-max">Deal max ($)</label>
-              <input id="deal-max" type="number" value={dealMax} onChange={(e) => setDealMax(e.target.value)} />
-            </div>
-            <div className="form-line" style={{ flex: 1, minWidth: 100 }}>
-              <label className="mono label-caps" htmlFor="daily-cap">Daily send cap</label>
-              <input id="daily-cap" type="number" min={1} value={dailyCap} onChange={(e) => setDailyCap(Number(e.target.value))} />
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: "var(--stack-md)", marginBottom: "var(--stack-sm)" }}>
-            <div className="form-line" style={{ flex: 1 }}>
-              <label className="mono label-caps" htmlFor="sender-name">Sender name</label>
-              <input id="sender-name" value={senderName} onChange={(e) => setSenderName(e.target.value)} />
-            </div>
-            <div className="form-line" style={{ flex: 1 }}>
-              <label className="mono label-caps" htmlFor="sender-email">Sender email</label>
-              <input id="sender-email" type="email" value={senderEmail} onChange={(e) => setSenderEmail(e.target.value)} />
-            </div>
+          <div className="form-line" style={{ marginBottom: "var(--stack-sm)", maxWidth: 200 }}>
+            <label className="mono label-caps" htmlFor="daily-cap">Daily send cap</label>
+            <input id="daily-cap" type="number" min={1} value={dailyCap} onChange={(e) => setDailyCap(Number(e.target.value))} />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <button
-              type="button"
-              className="mono"
-              onClick={() => setAutoFollowups(!autoFollowups)}
-              style={{ background: autoFollowups ? "var(--kraft)" : "transparent", border: "1px solid var(--ink)", padding: "0.4rem 0.75rem", cursor: "pointer", textAlign: "left" }}
-            >
-              {autoFollowups ? "✓" : "·"} Auto follow-ups
-            </button>
             <button
               type="button"
               className="mono"
@@ -249,6 +219,17 @@ export default function SalesSetup({
             >
               {requireFirstSendApproval ? "✓" : "·"} Require approval before first send
             </button>
+            <button
+              type="button"
+              className="mono"
+              onClick={() => setAutoFollowups(!autoFollowups)}
+              style={{ background: autoFollowups ? "var(--kraft)" : "transparent", border: "1px solid var(--ink)", padding: "0.4rem 0.75rem", cursor: "pointer", textAlign: "left" }}
+            >
+              {autoFollowups ? "✓" : "·"} Plan follow-ups in sequences
+            </button>
+            <p className="mono" style={{ fontSize: 11, color: "var(--ink-soft)" }}>
+              Follow-ups stay in the sequence plan — approval and send gates still apply. Does not auto-send.
+            </p>
           </div>
         </div>
       </details>
