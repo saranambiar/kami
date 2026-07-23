@@ -21,8 +21,9 @@ const spaceMono = Space_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Kami — AI GTM Agency",
-  description: "Your domain in. A full campaign dossier out. Real outreach, executed.",
+  title: "Kami — AI go-to-market agency",
+  description:
+    "Tell Kami what you built. It helps you find customers and get your product in front of the right people.",
 };
 
 export default function RootLayout({

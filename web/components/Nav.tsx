@@ -1,10 +1,12 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 
 export default function Nav() {
   const router = useRouter();
   const pathname = usePathname();
+  const [showMore, setShowMore] = useState(false);
 
   return (
     <nav
@@ -37,7 +39,6 @@ export default function Nav() {
           </button>
         )}
         <a href="/" style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          {/* placeholder seal logo */}
           <span
             aria-hidden
             style={{
@@ -67,10 +68,22 @@ export default function Nav() {
           </span>
         </a>
       </div>
-      <div style={{ display: "flex", gap: "1.5rem" }} className="label-caps">
-        <a href="/board">Board</a>
-        <a href="/ledger">Ledger</a>
-        <a href="/crm">CRM</a>
+      <div style={{ display: "flex", gap: "1rem", alignItems: "center" }} className="label-caps">
+        <button
+          type="button"
+          className="label-caps"
+          onClick={() => setShowMore((v) => !v)}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink)" }}
+        >
+          More
+        </button>
+        {showMore && (
+          <>
+            <a href="/board">Board</a>
+            <a href="/ledger">Ledger</a>
+            <a href="/crm">CRM</a>
+          </>
+        )}
       </div>
     </nav>
   );

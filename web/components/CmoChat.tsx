@@ -72,12 +72,21 @@ export default function CmoChat({
           : null,
       });
       // Reinject pack every turn so gateway timeouts cannot wipe company knowledge.
-      await streamChat(cmoPrompt(question, contextPack), sessionId, (delta) => {
-        setMessages((m) => {
-          const last = m[m.length - 1];
-          return [...m.slice(0, -1), { ...last, text: last.text + delta }];
-        });
-      });
+      await streamChat(
+        cmoPrompt(question, contextPack),
+        sessionId,
+        (delta) => {
+          setMessages((m) => {
+            const last = m[m.length - 1];
+            return [...m.slice(0, -1), { ...last, text: last.text + delta }];
+          });
+        },
+        {
+          kamiSessionId: sessionDbId,
+          kind: "cmo_chat",
+          agent: "cmo",
+        },
+      );
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "request failed";
       setMessages((m) => [...m.slice(0, -1), { role: "cmo", text: `⚠ ${msg}` }]);
@@ -88,7 +97,7 @@ export default function CmoChat({
 
   return (
     <section style={{ marginTop: "var(--stack-lg)", marginBottom: "var(--stack-lg)" }}>
-      <h3 style={{ marginBottom: "var(--stack-sm)" }}>Talk to your CMO</h3>
+      <h3 style={{ marginBottom: "var(--stack-sm)" }}>Ask Kami</h3>
       <div className="kraft-card">
         {messages.length === 0 && (
           <p style={{ color: "var(--ink-soft)" }}>
@@ -98,7 +107,7 @@ export default function CmoChat({
         )}
         {messages.map((m, i) => (
           <div key={i} style={{ marginBottom: "var(--stack-sm)" }}>
-            <span className="label-caps">{m.role === "you" ? "You" : "CMO"}</span>
+            <span className="label-caps">{m.role === "you" ? "You" : "Kami"}</span>
             <p style={{ whiteSpace: "pre-wrap" }}>{m.text || "…"}</p>
           </div>
         ))}

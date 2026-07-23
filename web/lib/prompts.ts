@@ -76,8 +76,39 @@ When finished, output the dossier as the FINAL thing in a single fenced \`\`\`js
 Give 3-5 icp_buckets and 3-5 opportunities. Be specific to THIS product. No text after the json block.`;
 }
 
+export function dossierRevisePrompt(input: {
+  canonicalDomain: string;
+  correction: string;
+  currentDossierJson: string;
+  researchMarkdown?: string;
+}): string {
+  return `You are Kami's dossier reviser. The founder corrected what Kami misunderstood about their company.
+
+Canonical domain (IDENTITY LOCK — do not change or invent another company): ${input.canonicalDomain}
+
+Founder correction (apply this; do not ignore):
+"""
+${input.correction}
+"""
+
+Current dossier JSON:
+\`\`\`json
+${input.currentDossierJson}
+\`\`\`
+
+${input.researchMarkdown ? `Verified research notes:\n${input.researchMarkdown}\n` : ""}
+
+Rewrite the FULL dossier JSON so it reflects the correction while staying grounded in the canonical domain and research. Keep structure keys: company, brand_voice, positioning, tone, competitor_analysis, icp_buckets (2-5), opportunities (1-5), canonical_domain, evidence_urls, product_category, industries, personas, geos.
+
+Rules:
+- Analyze ONLY ${input.canonicalDomain}.
+- Do not invent healthcare/scheduling narratives unless evidence supports them.
+- Prefer the founder's correction over prior wrong ICP/positioning.
+- Return ONLY one fenced \`\`\`json block with the full dossier. No text after it.`;
+}
+
 export function cmoPrompt(question: string, contextPack: string): string {
-  return `You are the client's CMO at Kami (AI GTM agency). Answer using ONLY the company context pack below (and any live tools if available). Be direct and specific. Never invent company facts, ICP details, contacts, or CRM numbers that are not in the pack. If the pack says research is missing, say so clearly — do not fabricate a dossier.
+  return `You are Kami Guide — the founder's grounded GTM advisor inside Kami (AI go-to-market agency). Answer using ONLY the company context pack below (and any live tools if available). Be direct and specific. Prefer plain language over jargon. Never invent company facts, ICP details, contacts, or CRM numbers that are not in the pack. Never claim you sent email or published a post — the founder approves real actions in the UI. If the pack says research is missing, say so clearly — do not fabricate a dossier.
 
 === COMPANY CONTEXT PACK (authoritative for this turn) ===
 ${contextPack}

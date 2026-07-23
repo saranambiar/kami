@@ -1,7 +1,7 @@
 import type { Dossier } from "@/lib/hermes";
 import type { SalesCampaignConfig } from "@/lib/salesTypes";
 
-const PLATFORM_BLURB = `Kami can: Sales outbound (research companies → draft personalized emails → pause for your OK before send) · Marketing (content / opportunities from Overview). Never invent CRM numbers, contacts, or company facts not in this pack.`;
+const PLATFORM_BLURB = `Kami can: Find customers (Sales: research → draft emails → founder approves before send) · Create distribution (Marketing: opportunity queue with drafts; manual post first; CRM/cold DMs are Advanced). Never invent CRM numbers, contacts, or company facts not in this pack. Never claim you sent or published.`;
 
 export interface CmoContextInput {
   dossier: Dossier | null;
@@ -19,12 +19,24 @@ export interface CmoContextInput {
     evidenceUrls?: string[];
   } | null;
   stage?: string | null;
+  /** Current founder job on the UI. */
+  activeJob?: "find_customers" | "create_distribution" | null;
+  blockers?: string[] | null;
 }
 
 /** Compact company pack for every CMO turn (~1–2k tokens). */
 export function buildCompanyContextPack(input: CmoContextInput): string {
-  const { dossier, domain, salesConfig, goals, canonicalDomain, researchProvenance, stage } =
-    input;
+  const {
+    dossier,
+    domain,
+    salesConfig,
+    goals,
+    canonicalDomain,
+    researchProvenance,
+    stage,
+    activeJob,
+    blockers,
+  } = input;
   const host = (canonicalDomain || dossier?.canonical_domain || domain).replace(/^www\./, "");
   const company =
     dossier?.company?.trim() || host.replace(/^www\./, "").split(".")[0] || host;
@@ -87,6 +99,14 @@ export function buildCompanyContextPack(input: CmoContextInput): string {
   }
   if (stage) {
     lines.push(`Campaign stage: ${stage}`);
+  }
+  if (activeJob) {
+    lines.push(
+      `Active job: ${activeJob === "find_customers" ? "Find customers (Sales)" : "Create distribution (Marketing)"}`,
+    );
+  }
+  if (blockers?.length) {
+    lines.push(`Blockers: ${blockers.join("; ")}`);
   }
 
   if (dossier.tone?.length) {

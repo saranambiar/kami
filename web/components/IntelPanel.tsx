@@ -42,9 +42,11 @@ function Section({
 
 interface IntelPanelProps {
   dossier: Dossier;
+  /** When true, open every section (confirm overview). */
+  defaultAllOpen?: boolean;
 }
 
-export default function IntelPanel({ dossier }: IntelPanelProps) {
+export default function IntelPanel({ dossier, defaultAllOpen = false }: IntelPanelProps) {
   return (
     <aside>
       <p className="label-caps" style={{ marginBottom: "var(--stack-sm)" }}>
@@ -55,12 +57,12 @@ export default function IntelPanel({ dossier }: IntelPanelProps) {
         <p style={{ fontSize: 14 }}>{dossier.brand_voice}</p>
       </Section>
 
-      <Section title="Positioning">
+      <Section title="Positioning" defaultOpen={defaultAllOpen}>
         <p style={{ fontSize: 14 }}>{dossier.positioning}</p>
       </Section>
 
       {dossier.tone && dossier.tone.length > 0 && (
-        <Section title="Tone">
+        <Section title="Tone" defaultOpen={defaultAllOpen}>
           <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
             {dossier.tone.map((t) => (
               <span
@@ -75,7 +77,7 @@ export default function IntelPanel({ dossier }: IntelPanelProps) {
         </Section>
       )}
 
-      <Section title="Competitors">
+      <Section title="Competitors" defaultOpen={defaultAllOpen}>
         {dossier.competitor_analysis.map((c) => (
           <p key={c.name} style={{ fontSize: 14, marginBottom: "0.5rem" }}>
             <strong>{c.name}</strong> — {c.insight}

@@ -231,6 +231,11 @@ export default function Home() {
           full += delta;
           syncEvents(full);
         },
+        {
+          kamiSessionId: dbIdRef.current,
+          kind: "dossier_research",
+          agent: "onboarding",
+        },
       );
 
       const raw = parseDossierRaw(full);
@@ -300,10 +305,19 @@ export default function Home() {
     setRunning(true);
     let full = "";
     try {
-      full = await streamChat(executePrompt(title, playbook), sessionRef.current, (delta) => {
-        full += delta;
-        syncEvents(full);
-      });
+      full = await streamChat(
+        executePrompt(title, playbook),
+        sessionRef.current,
+        (delta) => {
+          full += delta;
+          syncEvents(full);
+        },
+        {
+          kamiSessionId: dbIdRef.current,
+          kind: "opportunity_execute",
+          agent: "executor",
+        },
+      );
       persist(dbIdRef.current, "message", { role: "assistant", content: full });
 
       const { deliverable, needsInput } = parseDeliverable(full);
@@ -458,6 +472,7 @@ export default function Home() {
           onNewCampaign={newCampaign}
           onMarketingSetup={setMarketingConfig}
           onSalesSetup={setSalesConfig}
+          onDossierUpdated={setDossier}
         />
       )}
     </main>

@@ -20,12 +20,12 @@ interface LandingProps {
 }
 
 const FEATURES = [
-  { title: "Brand dossier from your domain", body: "One URL in. Voice, positioning, and competitor recon folded into a working dossier." },
-  { title: "Signal-based ICP buckets", body: "Not \u201cmid-market SaaS.\u201d Hyper-specific segments with a dated trigger, a size, and an angle." },
-  { title: "Reviewed outreach, really sent", body: "Every draft passes a strict reviewer before it touches a real inbox or feed." },
-  { title: "One approval, full execution", body: "You approve the play. The agency researches, drafts, reviews, and executes it." },
-  { title: "A CMO you can talk to", body: "Ask anything about your market. Answers grounded in your dossier, not vibes." },
-  { title: "Minimalist by design", body: "No dashboards full of noise. Paper, ink, and the work that matters." },
+  { title: "Brand dossier from your domain", body: "One URL in. Kami learns your product, audience, and proof before asking you to configure anything." },
+  { title: "Find customers", body: "A guided first outbound campaign: confirm who to help, check a few companies, approve emails before they send." },
+  { title: "Create distribution", body: "Today’s opportunities across X and research surfaces — drafts you approve, not spam automation." },
+  { title: "Reviewed actions only", body: "Every real send or publish waits for your OK. No invented emails. No surprise posts." },
+  { title: "Ask Kami", body: "A grounded guide on every screen. Ask what to do next — answers use your live campaign state." },
+  { title: "Self-hosted & BYOK", body: "Run locally with your own Hermes, model key, and Supabase. Optional research providers when you want them." },
 ];
 
 export default function Landing({
@@ -69,7 +69,10 @@ export default function Landing({
           KAMI<span style={{ color: "var(--hanko)" }}>.</span>
         </h1>
         <p style={{ color: "var(--ink-soft)", fontSize: 20, marginTop: "-0.5rem" }}>
-          Your AI Marketing Team
+          Your AI go-to-market agency for early-stage startups
+        </p>
+        <p style={{ color: "var(--ink-soft)", fontSize: 15, maxWidth: 440, lineHeight: 1.45 }}>
+          Tell Kami what you built. It helps you find customers and get your product in front of the right people.
         </p>
 
         {resumePrompt && (
@@ -119,7 +122,7 @@ export default function Landing({
             />
           </div>
           <button className="hanko-btn" type="submit" disabled={busy}>
-            {busy ? "Checking…" : "Begin"}
+            {busy ? "Checking…" : "Build my first customer plan"}
           </button>
         </form>
 
