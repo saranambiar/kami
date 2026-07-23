@@ -1,4 +1,50 @@
+# Evaluation & iteration plan doc — 2026-07-23
+
+- [x] Wrote `docs/evaluation-and-iteration-plan.md` (API harness, fixtures, rubric, RCA, cadence)
+- [x] Linked from product-loops, sales measurement-and-evals, memory index
+- [x] Researched and locked 10-company corpus in `docs/gold-standard-test-corpus.md`
+- [ ] Next: encode per-company gold standards as fixture YAMLs; then build the API harness
+
+---
+
+# End-to-end observability — 2026-07-23
+
+## Done
+- [x] Migration `010_agent_run_logs.sql` + `logAgentRun`
+- [x] Auto-log `hermesChatOnce` + `/api/chat` streams
+- [x] Pipeline logs: dossier persist, discover, distribution opportunities
+- [x] `GET /api/observability/runs` + Ledger Supabase section
+- [x] SETUP/memory docs
+
+## User still needs
+- [ ] Apply `010_agent_run_logs.sql` on Supabase
+
+---
+
+# Overview UX + dossier correction — 2026-07-23
+
+## Done
+- [x] Confirm layout + Intel open + Ask Kami full-height rail
+- [x] DossierConfirm edit/save + `POST /api/dossier/revise` regenerate
+- [x] Sales Advanced MVP cleanup
+- [x] PLG/D2C Find → Create distribution path
+- [x] Migration 009 error UX + SETUP/product-loops notes
+- [x] `npm run build` (web) passed
+
+## User still needs
+- [ ] Apply `009_distribution_opportunities.sql` on Supabase, then retry Marketing Early users
+
+---
+
 # Marketing discovery + onboarding (`feature/marketing`) — 2026-07-22
+
+## Review: Community MVP execution — 2026-07-23
+
+- Documented narrative + loops in `docs/product-loops.md`; Community Edition in `docs/community-edition.md` + `SETUP.md` + `README.md`.
+- Founder shell: dossier confirm → Find customers / Create distribution; Ask Kami drawer; global kill switch; Nav More.
+- Marketing: distribution opportunity queue default; CRM under Advanced; skills `*_distribution`; migration `009`.
+- Capabilities + readiness/sync scripts; MIT LICENSE; CI; sales real-send checklist (human-gated).
+- **User still needs:** apply migrations incl. `009`; supply AgentMail + controlled recipient for real Sales proof; connect dedicated Chrome CDP for browser research.
 
 ## Done
 - [x] Checkout `feature/marketing`; cherry-pick Phase 0 `8992c9b`; leave `feature/sales` untouched

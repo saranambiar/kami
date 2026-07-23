@@ -49,6 +49,8 @@ The harness imports `reviewEmailDraft`, `classifyReplyContent`, and `buildEmailS
 
 End-to-end staging verification: [`verification-checklist.md`](./verification-checklist.md).
 
+Multi-company live Hermes loop (API harness, not UI clicks): [`../evaluation-and-iteration-plan.md`](../evaluation-and-iteration-plan.md).
+
 ## Required evaluation checks
 
 - Research output must cite real evidence and refuse unsupported details.

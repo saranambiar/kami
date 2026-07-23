@@ -10,4 +10,9 @@
 - [Sales ICP confirm UX (align with SalesSetup; PLG personas editable)](./sales-icp-ux.md)
 - [Hermes setup guide (teammate + agent)](../references/hermes-setup-guide.md)
 - [Marketing vertical](./marketing-vertical.md)
+- [Community Edition (self-hosted BYOK)](./community-edition.md)
+- [Overview UX + dossier edit/regenerate + PLG→distribution](./overview-ux.md)
+- [Observability — agent_run_logs](./observability.md)
+- [Evaluation & iteration plan (multi-company E2E)](../docs/evaluation-and-iteration-plan.md)
+- [Gold-standard 10-company test corpus](../docs/gold-standard-test-corpus.md)
 - Research digest / source notes: `references/research-context.md`

@@ -21,3 +21,9 @@ Append short, reusable rules after corrections or mistakes.
 - Product-category defaults in Sales (Calendly/bookings/US/50-500) poison every downstream step when the dossier is thin. Prefer blank editable seeds + block confirm until candidates exist; never invent a vertical.
 - Changing Sales setup offer/ICP without clearing `segments_confirmed_at` lets Find run on a stale ICP — always invalidate segments on material setup change.
 - Confirm ICP (`SegmentConfirm`) must match SalesSetup visual language: `sales-panel` / `form-line` / `sales-textarea` / crease separators — not nested bordered boxes with cramped mono inputs. Validation that requires fields (e.g. PLG personas) must expose editable controls for those fields.
+- Community Edition default is self-hosted BYOK + local Hermes — do not hard-require `api.trykami.app` or Linkup. Prefer capability registry + graceful degradation (browser / provider / manual).
+- Marketing CRM/cold DMs are a later Advanced feature: preserve the code, remove from the default founder journey; primary Marketing loop is distribution opportunities.
+- PLG/D2C segments with no candidate companies correctly skip company Find — UI must not grey-out Hermes email as the only path; route to Marketing distribution and never invent consumer emails.
+- Sales Advanced should only expose controls that change Find/send gates in MVP; hide deal range and sender identity until they wire into discovery/AgentMail from-address.
+- For end-to-end observability, log at Hermes chokepoints (`hermesChatOnce` + `/api/chat`) with `kamiSessionId` + `kind` — do not rely on scattered route-only inserts or Hermes local state.db alone.
+- Public domains can change product posture quickly (for example, Arc versus Dia); a gold-standard fixture must pin source URLs and a research date, and treat product ambiguity as an explicit hard gate rather than a generic classification failure.
