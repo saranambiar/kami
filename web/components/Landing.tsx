@@ -53,30 +53,19 @@ export default function Landing({
 
   return (
     <div>
-      <section
-        style={{
-          minHeight: "calc(100vh - 140px)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          textAlign: "center",
-          gap: "var(--stack-md)",
-          padding: "var(--stack-lg) 0",
-        }}
-      >
-        <h1 style={{ fontSize: 64, letterSpacing: "0.04em" }}>
-          KAMI<span style={{ color: "var(--hanko)" }}>.</span>
+      <section className="landing-hero">
+        <h1 className="landing-brand">
+          KA<span style={{ color: "var(--hanko)" }}>MI</span>
         </h1>
-        <p style={{ color: "var(--ink-soft)", fontSize: 20, marginTop: "-0.5rem" }}>
+        <p className="landing-tagline">
           Your AI go-to-market agency for early-stage startups
         </p>
-        <p style={{ color: "var(--ink-soft)", fontSize: 15, maxWidth: 440, lineHeight: 1.45 }}>
+        <p className="landing-sub">
           Tell Kami what you built. It helps you find customers and get your product in front of the right people.
         </p>
 
         {resumePrompt && (
-          <div className="kraft-card" style={{ maxWidth: 420, textAlign: "left", padding: "var(--stack-md)" }}>
+          <div className="kraft-card landing-fade" style={{ maxWidth: 420, textAlign: "left", padding: "var(--stack-md)" }}>
             <p style={{ marginBottom: "var(--stack-sm)" }}>
               Continue previous campaign for <strong>{resumePrompt.domain}</strong>?
             </p>
@@ -97,17 +86,7 @@ export default function Landing({
           </div>
         )}
 
-        <form
-          onSubmit={submit}
-          style={{
-            display: "flex",
-            gap: "1.25rem",
-            alignItems: "flex-end",
-            flexWrap: "wrap",
-            justifyContent: "center",
-            marginTop: "var(--stack-sm)",
-          }}
-        >
+        <form className="landing-form" onSubmit={submit}>
           <div className="form-line" style={{ minWidth: 280, textAlign: "left" }}>
             <label className="mono label-caps" htmlFor="domain-input">
               ENTER YOUR DOMAIN TO START
@@ -121,7 +100,7 @@ export default function Landing({
               autoFocus
             />
           </div>
-          <button className="hanko-btn" type="submit" disabled={busy}>
+          <button className="hanko-btn landing-cta" type="submit" disabled={busy}>
             {busy ? "Checking…" : "Build my first customer plan"}
           </button>
         </form>
@@ -132,21 +111,23 @@ export default function Landing({
           </p>
         )}
 
-        <GoalChips
-          goals={goals}
-          stage={stage}
-          onGoalsChange={setGoals}
-          onStageChange={setStage}
-          disabled={busy}
-        />
+        <div className="landing-fade-delay">
+          <GoalChips
+            goals={goals}
+            stage={stage}
+            onGoalsChange={setGoals}
+            onStageChange={setStage}
+            disabled={busy}
+          />
+        </div>
 
-        <div style={{ marginTop: "var(--stack-sm)" }}>
+        <div className="landing-fade-delay" style={{ marginTop: "var(--stack-sm)" }}>
           <ConnectSocials />
         </div>
       </section>
 
-      <section style={{ paddingBottom: "var(--stack-lg)" }}>
-        <hr className="crease" />
+      <section className="landing-features">
+        <hr className="crease landing-crease" />
         <p className="label-caps" style={{ textAlign: "center", margin: "var(--stack-md) 0" }}>
           What Kami runs for you
         </p>

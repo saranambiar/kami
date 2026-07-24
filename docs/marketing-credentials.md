@@ -33,8 +33,9 @@ After login, accounts are bound to a browser `kami_claim` cookie, then claimed o
 1. Open [developer.x.com](https://developer.x.com) → your Project → App  
 2. **User authentication settings** → OAuth 2.0  
 3. Callback URL (must match env exactly):  
-   - Local: `http://localhost:3000/api/auth/x/callback`  
-   - Prod: `https://www.trykami.app/api/auth/x/callback`  
+   - Local (Community Edition default): `http://localhost:3000/api/auth/x/callback`  
+   - Self-hosted: `https://YOUR_DOMAIN/api/auth/x/callback`  
+
 4. App permissions: **Read and write** + Direct Messages if offered  
 5. Copy Client ID / Secret into `.env.local` (already done if X login works)  
 6. On Kami landing: **Log in with X** → see `X connected (@handle)`  

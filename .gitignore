@@ -1,7 +1,41 @@
-references/
+# Dependencies & build
+node_modules/
+web/node_modules/
+web/.next/
+web/out/
+web/build/
+**/dist/
+
+# Env / secrets — never commit
 .env
 .env.*
 !.env.example
+!**/.env.example
+web/.env.local
+*.pem
+
+# Hermes / local agent clutter
 .claude/settings.local.json
-node_modules/
+references/
+
+# E2E / eval artifacts (GAPLOG.md stays committed)
+web/evals/e2e/results/
+web/evals/e2e/CORPUS-*-OUTPUT-NOTES.md
+
+# OS / editors
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Media scratch
 video/out/
+
+# Logs / typescript
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.tsbuildinfo

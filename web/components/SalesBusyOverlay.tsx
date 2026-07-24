@@ -24,6 +24,7 @@ export default function SalesBusyOverlay({
   detail,
 }: SalesBusyOverlayProps) {
   const [index, setIndex] = useState(0);
+  const [elapsedSec, setElapsedSec] = useState(0);
 
   useEffect(() => {
     if (stages.length <= 1) return;
@@ -33,7 +34,17 @@ export default function SalesBusyOverlay({
     return () => window.clearInterval(id);
   }, [stages]);
 
+  useEffect(() => {
+    setElapsedSec(0);
+    const id = window.setInterval(() => setElapsedSec((s) => s + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [title]);
+
   const stage = stages[index] ?? stages[0];
+  const timeHint =
+    elapsedSec > 90
+      ? `Still working (${elapsedSec}s) — live checks can take a few minutes.`
+      : `This can take 30–90+ seconds — domains are checked live (${elapsedSec}s).`;
 
   return (
     <div className="sales-busy" role="status" aria-live="polite" aria-busy="true">
@@ -43,7 +54,7 @@ export default function SalesBusyOverlay({
       </p>
       <p className="sales-busy-stage">{detail?.trim() || stage}</p>
       <p className="mono" style={{ fontSize: 11, color: "var(--ink-soft)", marginTop: "0.75rem" }}>
-        This can take 30–90 seconds — domains are checked live.
+        {timeHint}
       </p>
       <ul className="sales-busy-ticks mono">
         {stages.map((s, i) => (

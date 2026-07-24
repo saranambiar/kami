@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# E2E harness run artifacts (GAPLOG.md stays committed)
+/evals/e2e/results/

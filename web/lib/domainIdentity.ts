@@ -61,6 +61,22 @@ export function sameRegistrableHost(a: string, b: string): boolean {
   return na === nb;
 }
 
+/** First label of a hostname (notion.so → notion). */
+export function apexLabel(host: string): string {
+  return host.toLowerCase().replace(/^www\./, "").split(".")[0] ?? "";
+}
+
+/**
+ * Same-brand TLD move (notion.so → notion.com). Rejects unrelated redirects.
+ * Requires apex label length ≥ 3 to avoid tiny ambiguous matches.
+ */
+export function isSameBrandHost(a: string, b: string): boolean {
+  if (sameRegistrableHost(a, b)) return true;
+  const la = apexLabel(a);
+  const lb = apexLabel(b);
+  return la.length >= 3 && la === lb;
+}
+
 function stripTags(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
@@ -76,15 +92,30 @@ function stripTags(html: string): string {
 }
 
 function metaContent(html: string, name: string): string | null {
-  const re = new RegExp(
-    `<meta[^>]+(?:name|property)=["']${name}["'][^>]+content=["']([^"']+)["']`,
-    "i",
-  );
-  const re2 = new RegExp(
-    `<meta[^>]+content=["']([^"']+)["'][^>]+(?:name|property)=["']${name}["']`,
-    "i",
-  );
-  return html.match(re)?.[1] ?? html.match(re2)?.[1] ?? null;
+  // Prefer double-quoted content (allows apostrophes like "It's 100% free")
+  const patterns = [
+    new RegExp(
+      `<meta[^>]+(?:name|property)=["']${name}["'][^>]+content="([^"]*)"`,
+      "i",
+    ),
+    new RegExp(
+      `<meta[^>]+content="([^"]*)"[^>]+(?:name|property)=["']${name}["']`,
+      "i",
+    ),
+    new RegExp(
+      `<meta[^>]+(?:name|property)=["']${name}["'][^>]+content='([^']*)'`,
+      "i",
+    ),
+    new RegExp(
+      `<meta[^>]+content='([^']*)'[^>]+(?:name|property)=["']${name}["']`,
+      "i",
+    ),
+  ];
+  for (const re of patterns) {
+    const m = html.match(re)?.[1];
+    if (m?.trim()) return m.trim();
+  }
+  return null;
 }
 
 function extractIdentityFromHtml(html: string, canonicalDomain: string, finalUrl: string): DomainIdentity {
@@ -119,7 +150,17 @@ function extractIdentityFromHtml(html: string, canonicalDomain: string, finalUrl
     if (orgName) break;
   }
 
-  const excerpt = stripTags(html).slice(0, 1200);
+  // JS shells (Duolingo, etc.) often have almost no body text — prefer meta cards.
+  const twitterDesc = metaContent(html, "twitter:description");
+  const ogTitle = metaContent(html, "og:title");
+  const twitterTitle = metaContent(html, "twitter:title");
+  let excerpt = stripTags(html).slice(0, 1200);
+  if (excerpt.length < 80) {
+    const metaBlob = [title, ogTitle, twitterTitle, description, twitterDesc]
+      .filter((s): s is string => Boolean(s && s.trim()))
+      .join(" — ");
+    if (metaBlob.length > excerpt.length) excerpt = metaBlob.slice(0, 1200);
+  }
   const companyGuess =
     orgName ||
     (title ? title.split(/[|\-–—]/)[0].trim() : null) ||
@@ -129,7 +170,7 @@ function extractIdentityFromHtml(html: string, canonicalDomain: string, finalUrl
     1,
     0.35 +
       (title ? 0.2 : 0) +
-      (description ? 0.15 : 0) +
+      (description || twitterDesc ? 0.15 : 0) +
       (h1 ? 0.1 : 0) +
       (orgName ? 0.15 : 0) +
       (excerpt.length > 200 ? 0.1 : 0),
@@ -140,8 +181,8 @@ function extractIdentityFromHtml(html: string, canonicalDomain: string, finalUrl
     canonical_domain: canonicalDomain,
     final_url: finalUrl,
     company_name: companyGuess,
-    title,
-    description,
+    title: title || ogTitle || twitterTitle,
+    description: description || twitterDesc,
     h1,
     excerpt,
     evidence_url: finalUrl,
@@ -159,7 +200,7 @@ async function fetchHtml(url: string, timeoutMs = 12_000): Promise<{ ok: boolean
       redirect: "follow",
       signal: controller.signal,
       headers: {
-        "User-Agent": "KamiDomainBot/1.0 (+https://trykami.app)",
+        "User-Agent": "KamiDomainBot/1.0 (+https://github.com/saranambiar/kami)",
         Accept: "text/html,application/xhtml+xml",
       },
     });
@@ -206,7 +247,7 @@ export async function validateDomainIdentity(raw: string): Promise<DomainValidat
       continue;
     }
 
-    if (!sameRegistrableHost(finalHost, canonical)) {
+    if (!isSameBrandHost(finalHost, canonical)) {
       return {
         ok: false,
         reason: "Domain redirected to another site",
@@ -214,7 +255,9 @@ export async function validateDomainIdentity(raw: string): Promise<DomainValidat
       };
     }
 
-    const identity = extractIdentityFromHtml(fetched.html, canonical, fetched.url);
+    // Prefer the live host when the brand moved TLDs (e.g. notion.so → notion.com)
+    const evidenceHost = sameRegistrableHost(finalHost, canonical) ? canonical : finalHost;
+    const identity = extractIdentityFromHtml(fetched.html, evidenceHost, fetched.url);
     if (!identity.excerpt || identity.excerpt.length < 40) {
       lastFail = "Website returned no usable content";
       continue;

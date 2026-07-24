@@ -226,7 +226,14 @@ export interface SalesContact {
   email?: string;
   handle?: string;
   channel?: SalesChannel;
-  email_verification?: "valid" | "safe_to_send" | "catch_all" | "unknown" | "invalid";
+  email_verification?:
+    | "valid"
+    | "safe_to_send"
+    | "role_inbox"
+    | "non_buyer_inbox"
+    | "catch_all"
+    | "unknown"
+    | "invalid";
   do_not_contact?: boolean;
   created_at?: string;
   updated_at?: string;

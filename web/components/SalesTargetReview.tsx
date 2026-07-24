@@ -63,6 +63,8 @@ export default function SalesTargetReview({
   const [emailBanner, setEmailBanner] = useState<string | null>(null);
   const [emailDrafts, setEmailDrafts] = useState<Record<string, string>>({});
   const [savingEmailId, setSavingEmailId] = useState<string | null>(null);
+  const [busyDetail, setBusyDetail] = useState<string | null>(null);
+  const [readyToDraft, setReadyToDraft] = useState(false);
 
   const planApproved = plan?.status === "approved";
 
@@ -131,39 +133,86 @@ export default function SalesTargetReview({
     if (!sessionDbId || paused) return;
     setBusy(true);
     setBusyMode("discover");
+    setBusyDetail("Verifying domains and looking up public contacts…");
     setError(null);
     setEmailBanner(null);
     setDiscoverMsg(null);
     setWarnings([]);
+    setReadyToDraft(false);
     try {
-      const res = await fetch("/api/sales/discover", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionDbId }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? "Discovery failed");
+      let json: {
+        error?: string;
+        warnings?: string[];
+        count?: number;
+        accounts?: { email?: string | null }[];
+      } | null = null;
+      try {
+        const res = await fetch("/api/sales/discover", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionDbId }),
+        });
+        json = await res.json();
+        if (!res.ok) {
+          // May still finish server-side — poll accounts before failing.
+          setBusyDetail("Request timed out or failed — checking for saved companies…");
+        }
+      } catch {
+        setBusyDetail("Connection interrupted — checking for saved companies…");
+      }
+
+      // Recover accounts if the long discover finished after a client timeout.
+      for (const waitMs of [0, 3000, 8000, 15000]) {
+        if (waitMs) await new Promise((r) => setTimeout(r, waitMs));
+        await fetchAccounts();
+        const accRes = await fetch(`/api/sales/accounts?session_id=${sessionDbId}`);
+        const accJson = await accRes.json();
+        const n = (accJson.accounts ?? []).length;
+        if (n > 0) {
+          setBusyDetail(`Found ${n} companies so far…`);
+          const warn = (json?.warnings as string[]) ?? [];
+          setWarnings(warn);
+          // Auto-include rows that already have a contact email so the draft CTA appears.
+          const withEmail = (accJson.accounts ?? []).filter(
+            (a: AccountWithMeta) => a.id && a.contact?.email && !isIncluded(a),
+          );
+          for (const acc of withEmail) {
+            await fetch("/api/sales/scores", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ account_id: acc.id, included: true }),
+            });
+          }
+          await fetchAccounts();
+          const included = withEmail.length;
+          setDiscoverMsg(
+            included > 0
+              ? `Found ${n} companies (${included} with email, selected). Click Draft emails to continue.`
+              : `Found ${n} companies. Use Find emails, check Include, then Draft emails.`,
+          );
+          if (included > 0) {
+            setEmailBanner(`Ready — draft emails for selected companies.`);
+            setReadyToDraft(true);
+          }
+          return;
+        }
+        if (json && !json.error && (json.count ?? 0) === 0) break;
+      }
+
+      if (json?.error) {
+        setError(json.error);
         return;
       }
-      const warn = (json.warnings as string[]) ?? [];
+      const warn = (json?.warnings as string[]) ?? [];
       setWarnings(warn);
-      if ((json.count ?? 0) === 0) {
-        setDiscoverMsg(
-          warn[0] ??
-            "No verifiable companies found — go back to ICP and refine segments or add real company domains.",
-        );
-      } else {
-        const withEmail = (json.accounts as { email?: string | null }[] | undefined)?.filter((a) => a.email)
-          .length ?? 0;
-        setDiscoverMsg(
-          `Found ${json.count} companies (${withEmail} with a public email). Check Include — Hermes/Linkup filled emails when evidence existed.`,
-        );
-      }
-      await fetchAccounts();
+      setDiscoverMsg(
+        warn[0] ??
+          "No verifiable companies found — go back to ICP and refine segments or add real company domains.",
+      );
     } finally {
       setBusy(false);
       setBusyMode(null);
+      setBusyDetail(null);
     }
   }
 
@@ -182,6 +231,7 @@ export default function SalesTargetReview({
 
     setBusy(true);
     setBusyMode("emails");
+    setBusyDetail(`Looking up emails for ${targets.length} companies…`);
     setError(null);
     setEmailBanner(null);
     try {
@@ -198,18 +248,38 @@ export default function SalesTargetReview({
         setError(json.error ?? "Email lookup failed");
         return;
       }
-      setDiscoverMsg(json.message ?? `Found ${json.found ?? 0} emails`);
-      if ((json.found ?? 0) === 0) {
+      const found = json.found ?? 0;
+      setDiscoverMsg(json.message ?? `Found ${found} emails`);
+      await fetchAccounts();
+
+      if (found === 0) {
         setEmailBanner(
           "Hermes found no public emails on those domains — add manually or uncheck companies without email.",
         );
+        setReadyToDraft(false);
       } else {
-        setEmailBanner(null);
+        // Auto-include accounts that now have emails so the next CTA is obvious.
+        const accRes = await fetch(`/api/sales/accounts?session_id=${sessionDbId}`);
+        const accJson = await accRes.json();
+        const fresh = (accJson.accounts ?? []) as AccountWithMeta[];
+        const withEmail = fresh.filter((a) => a.id && a.contact?.email && !isIncluded(a));
+        for (const acc of withEmail) {
+          await fetch("/api/sales/scores", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ account_id: acc.id, included: true }),
+          });
+        }
+        await fetchAccounts();
+        setEmailBanner(
+          `Found ${found} email${found === 1 ? "" : "s"}. Companies with emails are selected — continue to draft.`,
+        );
+        setReadyToDraft(true);
       }
-      await fetchAccounts();
     } finally {
       setBusy(false);
       setBusyMode(null);
+      setBusyDetail(null);
     }
   }
 
@@ -385,7 +455,7 @@ export default function SalesTargetReview({
 
   return (
     <div className="kraft-card" style={{ padding: "var(--stack-md)", marginTop: "var(--stack-md)", position: "relative" }}>
-      {busy && <SalesBusyOverlay title={busyTitle} stages={busyStages} />}
+      {busy && <SalesBusyOverlay title={busyTitle} stages={busyStages} detail={busyDetail} />}
 
       {offer && (
         <p className="mono" style={{ fontSize: 12, color: "var(--ink-soft)", marginBottom: "var(--stack-sm)" }}>
@@ -467,17 +537,13 @@ export default function SalesTargetReview({
           {includedCount > 0 && (
             <button
               type="button"
-              className="mono"
+              className="hanko-btn"
               onClick={continueWithSelected}
               disabled={busy}
-              style={{
-                border: "1px solid var(--ink)",
-                background: "transparent",
-                padding: "0.4rem 0.75rem",
-                cursor: "pointer",
-              }}
             >
-              Continue with selected ({includedCount})
+              {busy && busyMode === "continue"
+                ? "Building…"
+                : `Draft emails for ${includedCount} compan${includedCount === 1 ? "y" : "ies"}`}
             </button>
           )}
         </div>
@@ -499,8 +565,13 @@ export default function SalesTargetReview({
             background: "var(--kraft)",
           }}
         >
-          <p style={{ fontSize: 14, marginBottom: missingEmailSelected ? "0.5rem" : 0 }}>{emailBanner}</p>
-          {missingEmailSelected > 0 && (
+          <p style={{ fontSize: 14, marginBottom: "0.5rem" }}>{emailBanner}</p>
+          {readyToDraft && includedCount > 0 && (
+            <button type="button" className="hanko-btn" onClick={continueWithSelected} disabled={busy}>
+              Draft emails for {includedCount} compan{includedCount === 1 ? "y" : "ies"} →
+            </button>
+          )}
+          {missingEmailSelected > 0 && !readyToDraft && (
             <button
               type="button"
               className="hanko-btn"

@@ -1,13 +1,11 @@
 # Branch map (for coding agents)
 
-Last verified: 2026-07-23
+Last verified: 2026-07-24
 
 | Branch | Tip role | Notes |
 |--------|----------|--------|
-| **`dev`** | **Default / full product** | Up to date with `origin/dev`. Sales + marketing integrated. Use this unless told otherwise. |
-| `feature/sales` | Same tip as `dev` | Fast-forwarded with teammate sales work (ICP, domain-truth, segments, contact find). |
-| `feature/marketing` | Marketing-only ancestor | No commits ahead of `dev`. Marketing code on `dev` matches this tip. |
-| `prod` | Older production line | Behind `dev`; missing marketing vertical. |
-| `main` | Gone on remote | Local only; ignore. |
+| **`main`** | Public default / releases | Renamed from `prod`. Clone target. Tags `v0.x.y`. |
+| **`dev`** | Integration / PR target | Contributors open PRs here. Promote to `main` when stable. |
+| `feature/…` | Short-lived contributor branches | PR into `dev`. |
 
-Teammate recent work landed on `feature/sales` → `dev` (domain-truth, Confirm ICP, Hermes email lookup, sales segments). Marketing OAuth/discovery/DMs from earlier are already merged into that line.
+Retired: remote `prod` (renamed to `main`). Hosted trykami.app / Vercel auto-deploy disconnected for Community Edition (self-host BYOK).

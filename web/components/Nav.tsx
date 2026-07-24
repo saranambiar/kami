@@ -1,26 +1,25 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
 
 export default function Nav() {
   const router = useRouter();
   const pathname = usePathname();
-  const [showMore, setShowMore] = useState(false);
 
   return (
     <nav
       style={{
         borderBottom: "1px solid var(--crease)",
-        padding: "1rem var(--margin-page)",
+        padding: "0 var(--margin-page)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         maxWidth: 1440,
         margin: "0 auto",
+        height: 64,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", height: "100%" }}>
         {pathname !== "/" && (
           <button
             type="button"
@@ -30,60 +29,26 @@ export default function Nav() {
             style={{
               border: "1px solid var(--ink)",
               background: "transparent",
-              padding: "0.3rem 0.7rem",
+              padding: "0.25rem 0.55rem",
               cursor: "pointer",
               color: "var(--ink)",
+              fontSize: 12,
             }}
           >
             ← back
           </button>
         )}
-        <a href="/" style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <span
-            aria-hidden
-            style={{
-              width: 28,
-              height: 28,
-              background: "var(--hanko)",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "var(--paper)",
-              fontFamily: "var(--font-headline)",
-              fontWeight: 700,
-              fontSize: 14,
-            }}
-          >
-            紙
-          </span>
-          <span
-            style={{
-              fontFamily: "var(--font-headline)",
-              fontWeight: 700,
-              fontSize: 20,
-              letterSpacing: "0.02em",
-            }}
-          >
-            KAMI
-          </span>
-        </a>
-      </div>
-      <div style={{ display: "flex", gap: "1rem", alignItems: "center" }} className="label-caps">
-        <button
-          type="button"
-          className="label-caps"
-          onClick={() => setShowMore((v) => !v)}
-          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink)" }}
+        <a
+          href="/"
+          aria-label="Kami home"
+          style={{ display: "flex", alignItems: "center", height: "100%", lineHeight: 0 }}
         >
-          More
-        </button>
-        {showMore && (
-          <>
-            <a href="/board">Board</a>
-            <a href="/ledger">Ledger</a>
-            <a href="/crm">CRM</a>
-          </>
-        )}
+          <img
+            src="/kami-logo.png"
+            alt="Kami"
+            style={{ height: "100%", width: "auto", objectFit: "contain", display: "block" }}
+          />
+        </a>
       </div>
     </nav>
   );

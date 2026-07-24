@@ -75,12 +75,15 @@ export async function POST(request: Request): Promise<Response> {
       continue;
     }
 
+    // Persist truth: role/non-buyer stay visible but are not sequence-eligible.
     const verification =
       contact.verification_status === "role_inbox"
-        ? "safe_to_send"
-        : contact.verification_status === "hermes_evidence"
-          ? "valid"
-          : contact.verification_status === "verified_public"
+        ? "role_inbox"
+        : contact.verification_status === "non_buyer_inbox"
+          ? "non_buyer_inbox"
+          : contact.verification_status === "hermes_evidence" ||
+              contact.verification_status === "verified_public" ||
+              contact.verification_status === "valid"
             ? "valid"
             : "unknown";
 

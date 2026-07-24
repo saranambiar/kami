@@ -101,7 +101,8 @@ export async function researchDomainIdentity(identity: DomainIdentity): Promise<
     const queries = [
       `site:${host} (about OR product OR pricing OR customers)`,
       `site:${host} (customers OR "case study" OR documentation OR docs)`,
-      `"${host}" competitors OR alternatives`,
+      `"${host}" competitors OR alternatives OR firebase OR "open source" OR open-source`,
+      `site:${host} (open-source OR "open source" OR firebase OR alternatives OR vs)`,
       `site:${host} (funding OR hiring OR launch OR release)`,
     ];
 

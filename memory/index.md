@@ -1,5 +1,7 @@
 # Memory index
 
+Working notes for coding agents (`memory/`, `tasks/`, `lessons/`) — not end-user docs. Public onboarding lives in [README.md](../README.md), [SETUP.md](../SETUP.md), [CONTRIBUTING.md](../CONTRIBUTING.md).
+
 - [Branch map — which checkout has what](./branches.md)
 - [Outreach engine build state (sprint 1)](./outreach-engine.md)
 - [Hermes prerequisites & local status](./hermes-prerequisites.md)
@@ -15,4 +17,6 @@
 - [Observability — agent_run_logs](./observability.md)
 - [Evaluation & iteration plan (multi-company E2E)](../docs/evaluation-and-iteration-plan.md)
 - [Gold-standard 10-company test corpus](../docs/gold-standard-test-corpus.md)
+- [E2E eval harness (API runner + GAPLOG)](./e2e-eval-harness.md)
+- [Corpus-8 output notes (compare vs gold)](../docs/evals/corpus-8-output-notes.md)
 - Research digest / source notes: `references/research-context.md`

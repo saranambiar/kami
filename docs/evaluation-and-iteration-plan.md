@@ -58,18 +58,19 @@ Pick domains so the set spans:
 
 ### 3.3 Fixture file shape (proposed)
 
-Store under `web/evals/e2e/fixtures/` (to be created when harness lands):
+Implemented under `web/evals/e2e/`:
 
 ```text
 web/evals/e2e/
-  fixtures/
-    companies.yaml          # or one JSON per company
-    rubrics.md              # shared scoring dimensions
+  fixtures/companies.json   # 10 locked machine fixtures
+  lib/                      # apiClient, collect, score, gapLog, types
   run.ts                    # ordered API runner
-  score.ts                  # assertions + optional LLM-judge
   results/                  # gitignored run outputs
   GAPLOG.md                 # durable gap log (committed)
+  README.md                 # commands + safety boundary
 ```
+
+Run: `npm run eval:e2e -- --fixture argus` (see `web/evals/e2e/README.md`).
 
 Per-company fixture fields (minimum):
 
@@ -159,14 +160,9 @@ C. OBSERVE
 - **Idempotent-ish** — new session per run; don’t pollute prior campaign state mid-comparison.
 - **Secrets** — harness uses env (Supabase service role, Hermes key). Never commit keys.
 
-### 4.2 Implementation gap to close before first full green run
+### 4.2 Headless dossier (implemented)
 
-Today dossier generation is **client-driven** via `streamChat` → `/api/chat`. The harness should either:
-
-1. Call `/api/chat` the same way (SSE parse), or  
-2. Add `POST /api/dossier/generate` that runs onboarding server-side and writes `agent_run_logs`.
-
-Prefer (2) for stability. Until then, document the SSE client in `run.ts`.
+`POST /api/dossier/generate` runs onboarding server-side, validates, persists, and writes `dossier_research` / `dossier_persist` to `agent_run_logs`. The harness uses this — not the browser SSE path.
 
 Migrations required on the target project: through **`009`** (Marketing) and **`010`** (agent_run_logs).
 
@@ -359,14 +355,18 @@ Shared hard gates always apply (identity lock, no invented emails, observability
 
 ---
 
-## 10. Near-term build order (when we implement)
+## 10. Harness status
 
-1. Finalize §8 companies + per-fixture `expected` blocks with the team.
-2. Add `POST /api/dossier/generate` (or robust SSE helper) for headless dossier.
-3. Scaffold `web/evals/e2e/run.ts` for path A → B1/B2 → C.
-4. Add `score.ts` hard gates + summary markdown.
-5. First corpus run → GAPLOG → prioritize fixes.
-6. Optional: npm script `eval:e2e` and CI **nightly** (not blocking every PR until stable).
+1. [x] §8 companies + machine fixtures (`web/evals/e2e/fixtures/companies.json`)
+2. [x] `POST /api/dossier/generate`
+3. [x] `web/evals/e2e/run.ts` (Sales + Marketing, stop before send/publish)
+4. [x] Hard-gate scorer + aggregate markdown + `GAPLOG.md`
+5. [ ] First live corpus run → triage GAPLOG → prioritize fixes
+6. [ ] Optional CI **nightly** staging gate (not PR-blocking until stable)
+
+Commands: `npm run eval:e2e` · offline units remain `npm run eval:sales`.
+
+First 8-fixture output comparison (dossiers, accounts, opportunities, RCA notes): [evals/corpus-8-output-notes.md](./evals/corpus-8-output-notes.md).
 
 ---
 

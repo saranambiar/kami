@@ -4,7 +4,20 @@ import { researchFromSegments } from "@/lib/salesResearch";
 import type { SalesSegment } from "@/lib/salesSegments";
 import { normalizeSegments } from "@/lib/salesSegments";
 
+/** Discover + contact find can exceed default ~300s; keep the route alive for E2E/local. */
+export const maxDuration = 600;
+
 export async function POST(request: Request): Promise<Response> {
+  try {
+    return await postDiscover(request);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[sales/discover]", msg);
+    return Response.json({ error: msg }, { status: 500 });
+  }
+}
+
+async function postDiscover(request: Request): Promise<Response> {
   const sb = supabaseServer();
   if (!sb) return Response.json({ error: "supabase not configured" }, { status: 503 });
 
@@ -98,20 +111,32 @@ export async function POST(request: Request): Promise<Response> {
   }
   const discoveryRunId = runRow?.id as string | undefined;
 
+  // Log as soon as research completes — contact-find can outlive client timeouts
+  logAgentRunAsync({
+    sessionId: session_id,
+    source: "pipeline",
+    kind: "sales_discover",
+    agent: "discovery",
+    status: "ok",
+    outputJson: {
+      phase: "research_done",
+      count: researched.accounts.length,
+      warnings: researched.warnings,
+      discovery_run_id: discoveryRunId ?? null,
+      accounts: researched.accounts.map((a) => ({
+        name: a.name,
+        domain: a.domain,
+      })),
+    },
+    outputText:
+      researched.accounts
+        .map((a) => `${a.name} (${a.domain})`)
+        .join("\n") ||
+      researched.warnings.join("\n") ||
+      "No verifiable companies found",
+  });
+
   if (!researched.accounts.length) {
-    logAgentRunAsync({
-      sessionId: session_id,
-      source: "pipeline",
-      kind: "sales_discover",
-      agent: "discovery",
-      status: "ok",
-      outputJson: {
-        count: 0,
-        warnings: researched.warnings,
-        discovery_run_id: discoveryRunId ?? null,
-      },
-      outputText: researched.warnings.join("\n") || "No verifiable companies found",
-    });
     return Response.json({
       discovered: true,
       count: 0,
@@ -255,14 +280,18 @@ export async function POST(request: Request): Promise<Response> {
     let email: string | null = null;
     if (acc.contact?.email) {
       email = acc.contact.email;
+      // Persist truth: role/non-buyer stay visible but are not sequence-eligible.
+      // Never map role_inbox → safe_to_send.
       const verification =
         acc.contact.verification_status === "role_inbox"
-          ? "safe_to_send"
-          : acc.contact.verification_status === "verified_public" ||
-              acc.contact.verification_status === "hermes_evidence" ||
-              acc.contact.verification_status === "valid"
-            ? "valid"
-            : "unknown";
+          ? "role_inbox"
+          : acc.contact.verification_status === "non_buyer_inbox"
+            ? "non_buyer_inbox"
+            : acc.contact.verification_status === "verified_public" ||
+                acc.contact.verification_status === "hermes_evidence" ||
+                acc.contact.verification_status === "valid"
+              ? "valid"
+              : "unknown";
 
       const { data: existingContact } = await sb
         .from("sales_contacts")
@@ -331,6 +360,7 @@ export async function POST(request: Request): Promise<Response> {
     agent: "discovery",
     status: "ok",
     outputJson: {
+      phase: "completed",
       count: created.length,
       accounts: created,
       warnings: researched.warnings,

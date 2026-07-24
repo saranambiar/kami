@@ -104,6 +104,7 @@ export default function KamiGuide({
           kamiSessionId: sessionDbId,
           kind: "ask_kami",
           agent: "guide",
+          maxTokens: 400,
         },
       );
     } catch (error: unknown) {
@@ -180,14 +181,16 @@ export default function KamiGuide({
         }}
       >
         {messages.length === 0 && (
-          <p style={{ color: "var(--ink-soft)" }}>
+          <p className="kami-guide-message" style={{ color: "var(--ink-soft)" }}>
             Ask: “What should I do next?” or “Why is this company a fit?”
           </p>
         )}
         {messages.map((m, i) => (
           <div key={i}>
             <span className="label-caps">{m.role === "you" ? "You" : "Kami"}</span>
-            <p style={{ whiteSpace: "pre-wrap", marginTop: "0.25rem" }}>{m.text || "…"}</p>
+            <p className="kami-guide-message" style={{ whiteSpace: "pre-wrap", marginTop: "0.25rem" }}>
+              {m.text || "…"}
+            </p>
           </div>
         ))}
       </div>

@@ -239,7 +239,11 @@ export default function Home() {
       );
 
       const raw = parseDossierRaw(full);
-      const validated = validateDossier(raw, identity);
+      const evidenceText = [
+        snapshot.facts_markdown,
+        ...(snapshot.sources ?? []).map((s) => `${s.title ?? ""} ${s.excerpt ?? ""}`),
+      ].join("\n");
+      const validated = validateDossier(raw, identity, evidenceText);
       if (validated.ok && validated.dossier) {
         setDossier(validated.dossier);
         persist(dbIdRef.current, "dossier", validated.dossier as unknown as Record<string, unknown>);

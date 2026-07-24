@@ -124,7 +124,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const parsed = parseLastJsonBlock(text);
-  const validated = validateDossier(parsed, identity);
+  const validated = validateDossier(parsed, identity, researchMarkdown);
   if (!validated.ok || !validated.dossier) {
     return Response.json(
       {

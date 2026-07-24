@@ -8,7 +8,12 @@ export interface DossierValidationResult {
   errors: string[];
 }
 
-const SCHEDULING_WORDS = /\b(calendly|chili\s*piper|scheduling infrastructure|booking link|book meetings)\b/i;
+/** Strong scheduling claims that must be grounded in site/research evidence. */
+const SCHEDULING_CLAIM =
+  /\b(calendly|chili\s*piper|scheduling infrastructure|booking link|book meetings)\b/i;
+/** Broader tokens that ground those claims (JS-heavy sites often omit exact phrases). */
+const SCHEDULING_GROUNDING =
+  /\b(calendly|chili\s*piper|schedul|calendar|booking|book meetings|meeting link|appointment)\b/i;
 const HEALTH_WORDS = /\b(biochem|biotech|pharma|telehealth|healthcare clinic|medical device)\b/i;
 
 function asString(v: unknown): string {
@@ -17,10 +22,12 @@ function asString(v: unknown): string {
 
 /**
  * Strict dossier validation against validated domain identity.
+ * @param evidenceText optional research/facts markdown (and first-party excerpts) to ground vertical checks when the homepage extract is thin.
  */
 export function validateDossier(
   raw: unknown,
   identity: DomainIdentity,
+  evidenceText?: string | null,
 ): DossierValidationResult {
   const errors: string[] = [];
   if (!raw || typeof raw !== "object") {
@@ -64,11 +71,19 @@ export function validateDossier(
   });
   if (!hasFirstParty) errors.push("evidence_urls must include first-party domain URL");
 
-  // Reject vertical hallucination vs first-party excerpt
-  const siteBlob = `${identity.title ?? ""} ${identity.description ?? ""} ${identity.excerpt}`.toLowerCase();
-  const dossierBlob = `${positioning} ${company}`.toLowerCase();
+  // Reject vertical hallucination vs first-party excerpt + research evidence
+  const siteBlob = [
+    identity.title ?? "",
+    identity.description ?? "",
+    identity.excerpt,
+    identity.h1 ?? "",
+    evidenceText ?? "",
+  ]
+    .join(" ")
+    .toLowerCase();
+  const dossierBlob = `${positioning} ${company} ${asString(o.product_category)}`.toLowerCase();
 
-  if (SCHEDULING_WORDS.test(dossierBlob) && !SCHEDULING_WORDS.test(siteBlob)) {
+  if (SCHEDULING_CLAIM.test(dossierBlob) && !SCHEDULING_GROUNDING.test(siteBlob)) {
     errors.push("dossier invents scheduling/booking narrative not present on the company site");
   }
   if (HEALTH_WORDS.test(dossierBlob) && !HEALTH_WORDS.test(siteBlob)) {

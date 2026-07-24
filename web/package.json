@@ -7,7 +7,8 @@
     "dev:turbo": "next dev",
     "build": "next build",
     "start": "next start",
-    "eval:sales": "npx --yes tsx evals/sales/run.ts"
+    "eval:sales": "npx --yes tsx evals/sales/run.ts",
+    "eval:e2e": "npx --yes tsx evals/e2e/run.ts"
   },
   "dependencies": {
     "@langfuse/otel": "^5.9.1",
@@ -16,7 +17,8 @@
     "@supabase/supabase-js": "^2.110.2",
     "next": "16.2.10",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "undici": "^8.8.0"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

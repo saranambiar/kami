@@ -34,11 +34,11 @@ function scaffoldOpportunities(
       campaign_id: null,
       platform: "x",
       source_url: "https://x.com/search?q=" + encodeURIComponent(problem.slice(0, 40)),
-      evidence: "Scaffold — refine with live X search or browser research",
-      why_now: `People discussing ${problem} are active; a founder-native take can create early attention.`,
+      evidence: "[source=scaffold] Refine with live X search or browser research — not a researched opportunity",
+      why_now: `[FALLBACK] People discussing ${problem} are active; a founder-native take can create early attention.`,
       suggested_action: "Post a short insight or reply in a relevant thread; product mention only if natural.",
       draft: `Working on ${company}: ${angle}\n\nIf you're dealing with ${problem}, I'd love to hear what you've tried.`,
-      risks: "Avoid hard sells. Prefer usefulness and specificity.",
+      risks: "Avoid hard sells. Prefer usefulness and specificity. This row is a manual scaffold, not Hermes research.",
       approval_status: "needs_review",
       action_status: "draft",
       outcome: "none",
@@ -48,8 +48,8 @@ function scaffoldOpportunities(
       campaign_id: null,
       platform: "reddit",
       source_url: "manual://paste-thread-url",
-      evidence: "Manual mode — paste a real thread URL after you find one",
-      why_now: `Reddit discussions about ${problem} reward value-first comments.`,
+      evidence: "[source=scaffold] Manual mode — paste a real thread URL after you find one",
+      why_now: `[FALLBACK] Reddit discussions about ${problem} reward value-first comments.`,
       suggested_action: "Answer the question helpfully; mention the product only if rules allow and it fits.",
       draft: `I've been deep in this problem while building ${company}. Here's what worked for us…`,
       risks: "Read subreddit rules. Never spam. Prefer communities the founder already participates in.",
@@ -62,8 +62,8 @@ function scaffoldOpportunities(
       campaign_id: null,
       platform: "linkedin",
       source_url: "https://www.linkedin.com/feed/",
-      evidence: "Founder-post draft — publish manually",
-      why_now: "Founder-led posts outperform brand pages for early-stage credibility.",
+      evidence: "[source=scaffold] Founder-post draft — publish manually; not a researched thread",
+      why_now: "[FALLBACK] Founder-led posts outperform brand pages for early-stage credibility.",
       suggested_action: "Post as the founder; invite comments from people who've felt the pain.",
       draft: `${angle}\n\nBuilding ${company} taught me something specific about ${problem}.\n\nCurious: how are you solving this today?`,
       risks: "Keep it personal and specific. No engagement-bait templates.",
@@ -102,11 +102,21 @@ export async function researchDistributionOpportunities(input: {
     `Positioning: ${input.dossier?.positioning ?? "(unknown)"}`,
     `Goal: ${input.goal}`,
     `Campaign angle: ${input.angle}`,
-    "Return ONLY a JSON array (max 5) of distribution opportunities with keys:",
+    "Return ONLY a fenced json block containing a JSON array (max 5) of distribution opportunities.",
+    "Each object MUST include keys:",
     "platform (x|reddit|hackernews|linkedin|producthunt|discord), source_url, evidence, why_now,",
     "suggested_action, draft, risks.",
-    "Prefer real public URLs when you know them; otherwise use honest placeholders and say so in evidence.",
+    "Hard rules:",
+    "- source_url must be a real public thread/post URL (https://...), not a search page or positioning restatement.",
+    "- evidence must quote or paraphrase the specific thread title/snippet that makes this timely.",
+    "- why_now must reference that same source (title, community, or quote) — never restate company positioning alone.",
+    "- draft must be written as a reply/comment for that specific source, not a generic brand post.",
+    "- If you cannot find a real URL, omit that opportunity rather than inventing one.",
     "Never invent that you posted or messaged anyone. Manual-first. Value-first. No spam.",
+    "Output format:",
+    "```json",
+    '[{"platform":"reddit","source_url":"https://...","evidence":"...","why_now":"...","suggested_action":"...","draft":"...","risks":"..."}]',
+    "```",
   ].join("\n");
 
   try {
@@ -149,16 +159,20 @@ export async function researchDistributionOpportunities(input: {
       const platform = platforms.includes(o.platform as DistributionPlatform)
         ? (o.platform as DistributionPlatform)
         : "x";
-      const source_url = typeof o.source_url === "string" ? o.source_url : "manual://paste-url";
+      const source_url = typeof o.source_url === "string" ? o.source_url.trim() : "";
       const why_now = typeof o.why_now === "string" ? o.why_now : "";
       const suggested_action = typeof o.suggested_action === "string" ? o.suggested_action : "";
       const draft = typeof o.draft === "string" ? o.draft : "";
+      const evidence = typeof o.evidence === "string" ? o.evidence : null;
       if (!why_now || !suggested_action || !draft) continue;
+      // Drop invent/placeholder rows — better to fall back visibly than fake research.
+      if (!source_url.startsWith("http") || /manual:\/\//i.test(source_url)) continue;
+      if (/x\.com\/search|twitter\.com\/search|linkedin\.com\/feed\/?$/i.test(source_url)) continue;
       opportunities.push({
         campaign_id: null,
         platform,
         source_url,
-        evidence: typeof o.evidence === "string" ? o.evidence : null,
+        evidence,
         why_now,
         suggested_action,
         draft,

@@ -49,7 +49,7 @@ The harness imports `reviewEmailDraft`, `classifyReplyContent`, and `buildEmailS
 
 End-to-end staging verification: [`verification-checklist.md`](./verification-checklist.md).
 
-Multi-company live Hermes loop (API harness, not UI clicks): [`../evaluation-and-iteration-plan.md`](../evaluation-and-iteration-plan.md).
+Multi-company live Hermes loop (API harness, not UI clicks): [`../evaluation-and-iteration-plan.md`](../evaluation-and-iteration-plan.md). Implementation: `web/evals/e2e/` — run `npm run eval:e2e -- --fixture argus` (see `web/evals/e2e/README.md`).
 
 ## Required evaluation checks
 

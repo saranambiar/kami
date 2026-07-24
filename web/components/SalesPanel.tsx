@@ -41,9 +41,15 @@ interface SalesPanelProps {
   onCreateDistribution?: () => void;
 }
 
-function defaultOpsStep(config: SalesCampaignConfig | null, plan: SalesPlan | null): OpsStep {
+function defaultOpsStep(
+  config: SalesCampaignConfig | null,
+  plan: SalesPlan | null,
+  progress: { sequencesCreated: boolean; hasSent: boolean },
+): OpsStep {
   if (!config?.segments_confirmed_at) return "segments";
   if (!plan || plan.status !== "approved") return "plan";
+  if (progress.hasSent) return "needs";
+  if (progress.sequencesCreated) return "emails";
   return "find";
 }
 
@@ -90,22 +96,26 @@ export default function SalesPanel({
   }, [config?.autonomous_paused, config?.segments]);
 
   // Always land on Confirm ICP until segments_confirmed_at is set in the DB.
+  // Do not yank the founder backward once they have advanced past plan/find.
   useEffect(() => {
     if (!config) return;
     fetchPlan();
     if (!config.segments_confirmed_at) {
       setStep("segments");
-      return;
     }
-    // plan may still be loading — stay on plan until we know approval state
-    setStep("plan");
-  }, [config?.session_id, config?.segments_confirmed_at, fetchPlan, config]);
+  }, [config?.session_id, config?.segments_confirmed_at, fetchPlan]);
 
   useEffect(() => {
     if (!config?.segments_confirmed_at || !plan) return;
     if (focusStep === "find" || focusStep === "emails" || focusStep === "needs") return;
-    setStep(defaultOpsStep(config, plan));
-  }, [plan?.status, plan?.id, config, focusStep]);
+    setStep((prev) => {
+      const next = defaultOpsStep(config, plan, { sequencesCreated, hasSent });
+      const order: OpsStep[] = ["segments", "plan", "find", "emails", "needs"];
+      // Never move the founder backward on a config/plan refresh.
+      if (order.indexOf(prev) > order.indexOf(next)) return prev;
+      return next;
+    });
+  }, [plan?.status, plan?.id, config?.segments_confirmed_at, focusStep, sequencesCreated, hasSent]);
 
   useEffect(() => {
     if (!focusStep || focusStep === "confirm") return;

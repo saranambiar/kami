@@ -1,0 +1,158 @@
+[
+  {
+    "id": "mirage",
+    "domain": "trymirage.app",
+    "tags": ["plg", "consumer_ai", "browser"],
+    "expected": {
+      "job_primary": "create_distribution",
+      "dossier_must_include": ["browser", "website", "layout"],
+      "dossier_must_not": ["virtual filesystem", "strukto", "video generation", "B2B CRM"],
+      "company_name_hints": ["Mirage"],
+      "sales": { "discover_companies": false, "sales_default_invalid": true },
+      "marketing": { "goal": "early_users", "expect_opportunities": true },
+      "must_not": ["invent_consumer_emails", "force_find_companies_as_only_path", "enterprise_outbound_default"],
+      "required_log_kinds": ["dossier_research", "dossier_persist", "distribution_research", "distribution_opportunities"]
+    },
+    "notes": "Early-access browser personalization — Marketing/PLG only."
+  },
+  {
+    "id": "argus",
+    "domain": "arguslabs.in",
+    "tags": ["b2b", "ai_infra", "homonym_risk"],
+    "expected": {
+      "job_primary": "find_customers",
+      "dossier_must_include": ["observability", "agent", "pipeline"],
+      "dossier_must_not": ["biomedical", "biotech", "blockchain", "parallel-EVM", "security camera"],
+      "company_name_hints": ["ARGUS", "Argus"],
+      "sales": { "discover_companies": true },
+      "marketing": { "goal": "credibility", "expect_opportunities": false },
+      "must_not": ["invent_consumer_emails", "homonym_biomedical", "invent_customers"],
+      "required_log_kinds": ["dossier_research", "dossier_persist", "sales_segments", "sales_plan", "sales_discover"]
+    },
+    "notes": "Homonym stress — must stay agent-pipeline observability."
+  },
+  {
+    "id": "cal",
+    "domain": "cal.com",
+    "tags": ["b2b", "saas", "scheduling"],
+    "expected": {
+      "job_primary": "find_customers",
+      "dossier_must_include": ["schedul", "booking"],
+      "dossier_must_not": [],
+      "company_name_hints": ["Cal.com", "Cal"],
+      "sales": { "discover_companies": true },
+      "marketing": { "goal": "launch", "expect_opportunities": false },
+      "must_not": ["invent_consumer_emails", "default_healthcare_only", "listicle_accounts"],
+      "required_log_kinds": ["dossier_research", "dossier_persist", "sales_segments", "sales_plan", "sales_discover"]
+    },
+    "notes": "Happy-path B2B scheduling — do not force a single vertical."
+  },
+  {
+    "id": "nike-in",
+    "domain": "nike.in",
+    "tags": ["d2c", "consumer", "india"],
+    "expected": {
+      "job_primary": "create_distribution",
+      "dossier_must_include": ["nike", "sport", "footwear"],
+      "dossier_must_not": ["enterprise SaaS", "B2B CRM"],
+      "company_name_hints": ["Nike"],
+      "sales": { "discover_companies": false, "sales_default_invalid": true },
+      "marketing": { "goal": "early_users", "expect_opportunities": true },
+      "must_not": ["invent_consumer_emails", "force_find_companies_as_only_path", "shopper_email_blast"],
+      "required_log_kinds": ["dossier_research", "dossier_persist", "distribution_research", "distribution_opportunities"]
+    },
+    "notes": "D2C — never invent shopper emails."
+  },
+  {
+    "id": "linear",
+    "domain": "linear.app",
+    "tags": ["b2b", "saas", "productivity"],
+    "expected": {
+      "job_primary": "find_customers",
+      "dossier_must_include": ["product", "issue", "engineering"],
+      "dossier_must_not": ["social network", "to-do list app for consumers"],
+      "company_name_hints": ["Linear"],
+      "sales": { "discover_companies": true },
+      "marketing": { "goal": "credibility", "expect_opportunities": false },
+      "must_not": ["invent_consumer_emails", "listicle_accounts"],
+      "required_log_kinds": ["dossier_research", "dossier_persist", "sales_segments", "sales_plan", "sales_discover"]
+    }
+  },
+  {
+    "id": "browserbase",
+    "domain": "browserbase.com",
+    "tags": ["b2b", "ai_infra", "browser_agents"],
+    "expected": {
+      "job_primary": "find_customers",
+      "dossier_must_include": ["browser", "agent"],
+      "dossier_must_not": ["only a scraper"],
+      "company_name_hints": ["Browserbase"],
+      "sales": { "discover_companies": true },
+      "marketing": { "goal": "credibility", "expect_opportunities": false },
+      "must_not": ["invent_consumer_emails", "guarantee_captcha_bypass", "listicle_accounts"],
+      "required_log_kinds": ["dossier_research", "dossier_persist", "sales_segments", "sales_plan", "sales_discover"]
+    }
+  },
+  {
+    "id": "notion",
+    "domain": "notion.so",
+    "tags": ["plg", "b2b", "multi_product"],
+    "expected": {
+      "job_primary": "mixed",
+      "dossier_must_include": ["workspace", "docs"],
+      "dossier_must_not": ["only note-taking", "only enterprise"],
+      "company_name_hints": ["Notion"],
+      "sales": { "discover_companies": true },
+      "marketing": { "goal": "credibility", "expect_opportunities": true },
+      "must_not": ["invent_consumer_emails", "force_single_niche_icp"],
+      "required_log_kinds": ["dossier_research", "dossier_persist"]
+    },
+    "notes": "Mixed motion — either Sales or Marketing is OK if rationale is sound."
+  },
+  {
+    "id": "duolingo",
+    "domain": "duolingo.com",
+    "tags": ["plg", "consumer", "education"],
+    "expected": {
+      "job_primary": "create_distribution",
+      "dossier_must_include": ["language", "learn"],
+      "dossier_must_not": ["paid school SaaS only"],
+      "company_name_hints": ["Duolingo"],
+      "sales": { "discover_companies": false, "sales_default_invalid": true },
+      "marketing": { "goal": "early_users", "expect_opportunities": true },
+      "must_not": ["invent_consumer_emails", "sell_paid_schools", "learner_email_blast"],
+      "required_log_kinds": ["dossier_research", "dossier_persist", "distribution_research", "distribution_opportunities"]
+    }
+  },
+  {
+    "id": "supabase",
+    "domain": "supabase.com",
+    "tags": ["b2b", "plg", "developer"],
+    "expected": {
+      "job_primary": "find_customers",
+      "dossier_must_include": ["postgres", "firebase", "open source"],
+      "dossier_must_not": ["database consulting agency", "consumer social"],
+      "company_name_hints": ["Supabase"],
+      "sales": { "discover_companies": true },
+      "marketing": { "goal": "credibility", "expect_opportunities": false },
+      "must_not": ["invent_consumer_emails", "listicle_accounts", "tutorial_as_account"],
+      "required_log_kinds": ["dossier_research", "dossier_persist", "sales_segments", "sales_plan", "sales_discover"]
+    }
+  },
+  {
+    "id": "arc",
+    "domain": "arc.net",
+    "tags": ["plg", "consumer", "browser", "product_ambiguity"],
+    "expected": {
+      "job_primary": "create_distribution",
+      "dossier_must_include": ["browser"],
+      "dossier_must_not": ["enterprise license for Arc", "Dia security attributed to Arc"],
+      "company_name_hints": ["Arc", "Browser Company"],
+      "sales": { "discover_companies": false, "sales_default_invalid": true },
+      "marketing": { "goal": "early_users", "expect_opportunities": true },
+      "must_not": ["invent_consumer_emails", "conflate_arc_dia", "enterprise_arc_licenses"],
+      "required_log_kinds": ["dossier_research", "dossier_persist", "distribution_research", "distribution_opportunities"]
+    },
+    "notes": "Arc vs Dia disambiguation is a hard identity gate."
+  }
+]

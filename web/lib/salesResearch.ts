@@ -1,5 +1,9 @@
 import type { SalesSegment } from "./salesSegments";
-import { findContactForDomain, type FoundContact } from "./salesContactFinder";
+import {
+  findContactForDomain,
+  isBuyerReachableContact,
+  type FoundContact,
+} from "./salesContactFinder";
 import { linkupConfigured, searchLinkup } from "./linkup";
 
 export interface ProvenanceRecord {
@@ -210,6 +214,7 @@ export function scoreAccountAxes(params: {
 }): LeadScoreResult {
   const fit = Math.max(0, Math.min(1, params.fit));
   const intent = decayIntent(params.signalAgeDays ?? null, params.intentRaw);
+  // Buyer-reachable only elevates contactability; role/shared inboxes stay low.
   const contactability = params.hasVerifiedContact ? 0.85 : 0.25;
 
   if (fit < FIT_FLOOR) {
@@ -218,7 +223,7 @@ export function scoreAccountAxes(params: {
       intent,
       contactability,
       priority: 0,
-      explanation: `Fit ${(fit * 100).toFixed(0)}% below floor — deprioritized. Timing ${(intent * 100).toFixed(0)}%. ${params.hasVerifiedContact ? "Real contact found." : "No verified contact yet."}`,
+      explanation: `Fit ${(fit * 100).toFixed(0)}% below floor — deprioritized. Timing ${(intent * 100).toFixed(0)}%. ${params.hasVerifiedContact ? "Buyer-reachable contact found." : "No buyer-reachable contact yet."}`,
     };
   }
 
@@ -229,15 +234,16 @@ export function scoreAccountAxes(params: {
     `Fit ${(fit * 100).toFixed(0)}% — segment / firmographic match`,
     `Timing ${(intent * 100).toFixed(0)}% — signal freshness (decays after 2 weeks)`,
     params.hasVerifiedContact
-      ? `Reachable ${(contactability * 100).toFixed(0)}% — verified public/role email on company site`
-      : `Reachable ${(contactability * 100).toFixed(0)}% — no verified contact on company site yet`,
+      ? `Reachable ${(contactability * 100).toFixed(0)}% — buyer-shaped verified email on company site`
+      : `Reachable ${(contactability * 100).toFixed(0)}% — no buyer-reachable contact yet (role/shared inboxes do not count)`,
   ].join("; ");
 
   return { fit, intent, contactability, priority, explanation };
 }
 
-export function assignTierFromAxes(fit: number, intent: number, hasContact: boolean): 1 | 2 | 3 {
-  if (fit >= 0.65 && intent >= 0.55 && hasContact) return 1;
+export function assignTierFromAxes(fit: number, intent: number, hasBuyerContact: boolean): 1 | 2 | 3 {
+  // Tier 1 requires trigger-aligned intent AND a buyer-reachable contact — not any mailbox.
+  if (fit >= 0.65 && intent >= 0.55 && hasBuyerContact) return 1;
   if (fit >= 0.5 && intent >= 0.35) return 2;
   return 3;
 }
@@ -350,82 +356,109 @@ export async function researchFromSegments(
 
     let verifiedForSegment = 0;
 
-    for (const candidate of segment.candidate_companies) {
+    // Bound parallelism — sequential contact/Linkup was 90s+ for large seed lists.
+    const candidates = segment.candidate_companies.filter((candidate) => {
       const domain = normalizeCompanyDomain(candidate.domain);
-      if (!domain) continue;
-      if (offerHost && domain === offerHost) continue;
-      if (isDomainBlocked(domain)) continue;
-      if (isListicleTitle(candidate.name)) continue;
-      if (matchesExclusion(candidate.name, domain, exclusions)) continue;
-      if (buckets.has(domain)) continue;
+      if (!domain) return false;
+      if (offerHost && domain === offerHost) return false;
+      if (isDomainBlocked(domain)) return false;
+      if (isListicleTitle(candidate.name)) return false;
+      if (matchesExclusion(candidate.name, domain, exclusions)) return false;
+      return true;
+    });
 
-      const alive = await probeDomainAlive(domain);
-      if (!alive) {
-        warnings.push(`Could not verify ${candidate.name} (${domain}) — skipped`);
-        continue;
-      }
+    const CONCURRENCY = 3;
+    for (let i = 0; i < candidates.length; i += CONCURRENCY) {
+      const batch = candidates.slice(i, i + CONCURRENCY);
+      await Promise.all(
+        batch.map(async (candidate) => {
+          const domain = normalizeCompanyDomain(candidate.domain);
+          if (!domain || buckets.has(domain)) return;
 
-      const contact = await findContactForDomain(
-        domain,
-        candidate.name || companyNameFromDomain(domain),
-        kamiSessionId,
+          const alive = await probeDomainAlive(domain);
+          if (!alive) {
+            warnings.push(`Could not verify ${candidate.name} (${domain}) — skipped`);
+            return;
+          }
+
+          const contact = await findContactForDomain(
+            domain,
+            candidate.name || companyNameFromDomain(domain),
+            kamiSessionId,
+          );
+          const hasAnyEmail = Boolean(contact?.email);
+          const hasBuyerContact = Boolean(
+            contact?.email && isBuyerReachableContact(contact),
+          );
+
+          const linkupSignals = await fetchSignalsForCandidate({
+            domain,
+            companyName: candidate.name || companyNameFromDomain(domain),
+            trigger: segment.trigger_signal,
+            capturedAt,
+          });
+
+          const signals: ResearchedSignal[] = [...linkupSignals];
+          if (!signals.length) {
+            signals.push({
+              provider: "site_scrape",
+              url: `https://${domain}`,
+              captured_at: capturedAt,
+              confidence: 0.4,
+              evidence_text: `Verified live site for ${domain}`,
+              signal_type: "domain_alive",
+              detail: "Homepage reachable — no dated buying signal found",
+            });
+          }
+
+          const ageDays = signalAgeDays(linkupSignals, capturedAt);
+          const triggerTokens = (segment.trigger_signal || "")
+            .toLowerCase()
+            .split(/[^a-z0-9]+/)
+            .filter((t) => t.length >= 4);
+          const hasTriggerAlignedSignal = linkupSignals.some((s) => {
+            const blob = `${s.evidence_text} ${s.detail} ${s.signal_type}`.toLowerCase();
+            if (s.signal_type === "domain_alive") return false;
+            if (!triggerTokens.length) return Boolean(s.url);
+            return triggerTokens.some((t) => blob.includes(t));
+          });
+          const hasDatedSignal = linkupSignals.length > 0;
+          const fit = Math.min(1, 0.7 + (candidate.why ? 0.15 : 0) + (segment.why_fit ? 0.05 : 0));
+          const intentRaw = hasTriggerAlignedSignal ? 0.75 : hasDatedSignal ? 0.4 : 0.25;
+          const score = scoreAccountAxes({
+            fit,
+            intentRaw,
+            hasVerifiedContact: hasBuyerContact,
+            signalAgeDays: hasTriggerAlignedSignal ? ageDays ?? 7 : null,
+          });
+          if (score.priority <= 0 && fit < FIT_FLOOR) return;
+
+          if (!hasTriggerAlignedSignal) {
+            warnings.push(
+              `${candidate.name || domain}: no trigger-aligned buying signal — scored as nurture/hold, not Tier 1`,
+            );
+          }
+          if (hasAnyEmail && !hasBuyerContact) {
+            warnings.push(
+              `${candidate.name || domain}: found ${contact!.email} but it is not buyer-reachable (${contact!.verification_status})`,
+            );
+          }
+
+          const tier = assignTierFromAxes(score.fit, score.intent, hasBuyerContact);
+          buckets.set(domain, {
+            name: candidate.name || companyNameFromDomain(domain),
+            domain,
+            industry: segment.name,
+            tier,
+            segment_key: segment.key,
+            score,
+            signals,
+            notes: candidate.why,
+            contact: contact ?? null,
+          });
+          verifiedForSegment++;
+        }),
       );
-      const hasContact = Boolean(contact?.email);
-
-      const linkupSignals = await fetchSignalsForCandidate({
-        domain,
-        companyName: candidate.name || companyNameFromDomain(domain),
-        trigger: segment.trigger_signal,
-        capturedAt,
-      });
-
-      const signals: ResearchedSignal[] = [...linkupSignals];
-      // First-party alive probe as weak provenance when Linkup empty
-      if (!signals.length) {
-        signals.push({
-          provider: "site_scrape",
-          url: `https://${domain}`,
-          captured_at: capturedAt,
-          confidence: 0.4,
-          evidence_text: `Verified live site for ${domain}`,
-          signal_type: "domain_alive",
-          detail: "Homepage reachable — no dated buying signal found",
-        });
-      }
-
-      const ageDays = signalAgeDays(linkupSignals, capturedAt);
-      const hasDatedSignal = linkupSignals.length > 0;
-      // Fit: segment-named candidates start high; bump if why text present
-      const fit = Math.min(1, 0.7 + (candidate.why ? 0.15 : 0) + (segment.why_fit ? 0.05 : 0));
-      // Intent: only elevate when URL-backed Linkup signals exist; else nurture/hold
-      const intentRaw = hasDatedSignal ? 0.75 : 0.25;
-      const score = scoreAccountAxes({
-        fit,
-        intentRaw,
-        hasVerifiedContact: hasContact,
-        signalAgeDays: hasDatedSignal ? ageDays ?? 7 : null,
-      });
-      if (score.priority <= 0 && fit < FIT_FLOOR) continue;
-
-      if (!hasDatedSignal) {
-        warnings.push(
-          `${candidate.name || domain}: no dated buying signal — scored as nurture/hold, not high intent`,
-        );
-      }
-
-      const tier = assignTierFromAxes(score.fit, score.intent, hasContact);
-      buckets.set(domain, {
-        name: candidate.name || companyNameFromDomain(domain),
-        domain,
-        industry: segment.name,
-        tier,
-        segment_key: segment.key,
-        score,
-        signals,
-        notes: candidate.why,
-        contact: contact ?? null,
-      });
-      verifiedForSegment++;
     }
 
     if (verifiedForSegment === 0 && segment.motion === "b2b_sales_assisted") {

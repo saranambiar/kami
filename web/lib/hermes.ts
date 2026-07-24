@@ -39,6 +39,8 @@ export interface StreamChatOptions {
   kamiSessionId?: string | null;
   kind?: string;
   agent?: string;
+  /** Soft completion budget — used for Ask Kami brevity */
+  maxTokens?: number;
 }
 
 /**
@@ -65,6 +67,7 @@ export async function streamChat(
       model: "gpt-5.4",
       stream: true,
       messages: [{ role: "user", content }],
+      ...(options?.maxTokens ? { max_tokens: options.maxTokens } : {}),
     }),
   });
 

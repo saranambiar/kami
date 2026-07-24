@@ -27,3 +27,14 @@ Append short, reusable rules after corrections or mistakes.
 - Sales Advanced should only expose controls that change Find/send gates in MVP; hide deal range and sender identity until they wire into discovery/AgentMail from-address.
 - For end-to-end observability, log at Hermes chokepoints (`hermesChatOnce` + `/api/chat`) with `kamiSessionId` + `kind` — do not rely on scattered route-only inserts or Hermes local state.db alone.
 - Public domains can change product posture quickly (for example, Arc versus Dia); a gold-standard fixture must pin source URLs and a research date, and treat product ambiguity as an explicit hard gate rather than a generic classification failure.
+- E2E corpus harness must be API-ordered (not Playwright), stop before send/publish, and append failures to a durable GAPLOG — never delete failing fixtures to go green. Prefer `POST /api/dossier/generate` over parsing browser SSE.
+- Vertical “invention” checks must ground against research facts + first-party excerpts, not only a thin homepage extract — JS marketing sites (e.g. cal.com) otherwise false-reject correct product language. Harness segment confirm must seed PLG example users like `SegmentConfirm`.
+- Node/undici default `headersTimeout` is 300s — Sales discover often finishes just after that, so the harness must use a longer Agent for slow routes (or you’ll see `fetch failed` while Next logs HTTP 200).
+- Brand TLD moves (notion.so → notion.com) are not “redirected to another site” — accept same apex-label hosts and canonicalize to the live evidence host.
+- Ask Kami replies must stay short (≤120 words default) with compact 14px rail typography — founders reject essay-length chat in a narrow column.
+- Sales ICP GET must return cached draft segments; re-deriving Hermes on every Confirm ICP mount looks like an endless “loading / deriving” loop.
+- SalesPanel step effects must never yank the founder backward from Emails/Find when config refreshes.
+- After email find succeeds, surface a Hanko-red “Draft emails for N” CTA and auto-include contacts with emails — Include checkboxes alone are not discoverable.
+- Marketing “What happened?” chips need optimistic UI + confirmation copy; silent outcome patches feel broken.
+- Connected X must expose approve → Post to X in the distribution queue; Login with X alone without publish is confusing.
+- Open-source packaging: update existing README/SETUP/CONTRIBUTING in place; never duplicate LICENSE; agent setup prompts live in community-edition.md; keep Board/Ledger/CRM routes but out of default nav.

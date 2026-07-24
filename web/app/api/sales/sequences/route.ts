@@ -2,7 +2,8 @@ import { supabaseServer } from "@/lib/supabase";
 import { buildEmailSequence, SEQUENCE_STEPS } from "@/lib/salesSequences";
 import type { AccountSignal, SalesAccount } from "@/lib/salesTypes";
 
-const VALID_EMAIL_VERIFICATION = new Set(["valid", "safe_to_send"]);
+/** Buyer-reachable only — role/non-buyer/safe_to_send aliases are not sequence-eligible. */
+const VALID_EMAIL_VERIFICATION = new Set(["valid"]);
 
 export async function GET(request: Request): Promise<Response> {
   const sb = supabaseServer();

@@ -28,7 +28,7 @@ Open **http://localhost:3000** (PowerShell on Windows is more reliable than WSL 
 | `NEXT_PUBLIC_SUPABASE_URL` | Sessions, Sales persistence |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server writes |
 | `HERMES_API_KEY` | Overview dossier + CMO chat (**must be uncommented**) |
-| `HERMES_GATEWAY_URL` | `https://api.trykami.app/v1/chat/completions` or `http://127.0.0.1:8642/v1/chat/completions` if local Hermes |
+| `HERMES_GATEWAY_URL` | `http://127.0.0.1:8642/v1/chat/completions` (local Hermes; Community Edition default) |
 | `LINKUP_API_KEY` | Sales discovery + landing research |
 | `AGENTMAIL_API_KEY` + `AGENTMAIL_INBOX` | Real email send (optional phase) |
 | `GOOGLE_CLIENT_ID` / `SECRET` / `REFRESH_TOKEN` | Calendar invites (optional phase) |

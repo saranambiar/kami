@@ -1,9 +1,30 @@
+# E2E evaluation harness — 2026-07-23
+
+## Done
+- [x] Fixtures `web/evals/e2e/fixtures/companies.json` (10 companies)
+- [x] `POST /api/dossier/generate` + observability
+- [x] Runner `web/evals/e2e/run.ts` (Sales + Marketing, safe stop)
+- [x] Collector + hard-gate scorer + aggregate report + `GAPLOG.md`
+- [x] `npm run eval:e2e` + README + docs/memory links
+
+## Next
+- [x] Live dry-run: `argus` (first FAIL timeout; **rerun PASS** 2026-07-24) + `mirage` (PASS)
+- [ ] Optional harden: discover `maxDuration` + earlier `sales_discover` log (flake guard)
+- [ ] Full corpus → triage GAPLOG
+- [ ] Optional nightly staging gate (non-blocking)
+
+## User still needs
+- [ ] Apply Supabase migrations `009` + `010` if not applied
+- [ ] Hermes + web env up for live runs
+
+---
+
 # Evaluation & iteration plan doc — 2026-07-23
 
 - [x] Wrote `docs/evaluation-and-iteration-plan.md` (API harness, fixtures, rubric, RCA, cadence)
 - [x] Linked from product-loops, sales measurement-and-evals, memory index
 - [x] Researched and locked 10-company corpus in `docs/gold-standard-test-corpus.md`
-- [ ] Next: encode per-company gold standards as fixture YAMLs; then build the API harness
+- [x] Encoded fixtures + built API harness (`web/evals/e2e/`)
 
 ---
 

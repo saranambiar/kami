@@ -63,6 +63,16 @@ export async function GET(request: Request): Promise<Response> {
     });
   }
 
+  // Return cached draft segments without re-running Hermes on every mount.
+  const refresh = new URL(request.url).searchParams.get("refresh") === "1";
+  if (!refresh && Array.isArray(campaign.segments) && campaign.segments.length) {
+    return Response.json({
+      segments: campaign.segments as SalesSegment[],
+      confirmed_at: null,
+      source: "draft",
+    });
+  }
+
   const { dossier, domain, goals } = await loadSessionContext(sessionId);
   if (!domain) return Response.json({ error: "session domain not found" }, { status: 400 });
 
@@ -72,6 +82,16 @@ export async function GET(request: Request): Promise<Response> {
     goals,
     kamiSessionId: sessionId,
   });
+
+  // Persist draft so remounts don't loop Hermes derivation.
+  await sb
+    .from("sales_campaigns")
+    .update({
+      segments: derived.segments,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", campaign.id);
+
   return Response.json({
     segments: derived.segments,
     confirmed_at: null,
@@ -111,6 +131,14 @@ export async function POST(request: Request): Promise<Response> {
       goals,
       kamiSessionId: session_id,
     });
+    await sb
+      .from("sales_campaigns")
+      .update({
+        segments: derived.segments,
+        segments_confirmed_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", campaign.id);
     return Response.json({
       segments: derived.segments,
       confirmed_at: null,

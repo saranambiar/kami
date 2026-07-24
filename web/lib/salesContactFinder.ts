@@ -9,6 +9,7 @@ import { linkupConfigured, searchLinkup } from "./linkup";
 export type EmailVerificationStatus =
   | "verified_public"
   | "role_inbox"
+  | "non_buyer_inbox"
   | "unverified"
   | "valid"
   | "hermes_evidence";
@@ -20,10 +21,34 @@ export interface FoundContact {
   verification_status: EmailVerificationStatus;
   source_url: string;
   method?: "site_scrape" | "linkup" | "hermes";
+  /** True only for persona/buyer-shaped locals — never role/shared/malformed. */
+  buyer_reachable?: boolean;
 }
 
+/** Shared/role inboxes — real but not sequence-eligible as a buyer. */
 const ROLE_LOCAL =
-  /^(hello|hi|sales|contact|info|support|team|outreach|partnerships|partners|business|demo|getstarted|hello\+|sales\+)$/i;
+  /^(hello|hi|sales|contact|info|support|team|outreach|partnerships|partners|business|demo|getstarted|hello\+|sales\+|press|privacy|hr|legal|webmaster|security|billing|careers|jobs|recruiting|dpo|compliance|abuse|admin|office|help|customerservice|customer\.?service|media|pr|communications|comms|taxagencies|accommodations|fi-support|platform-support|partner-marketing|supplyco)$/i;
+
+/** Single-letter / hash-like / placeholder locals — never treat as buyers. */
+const NON_BUYER_LOCAL = /^(e|h|last|first|first\.last|name|user|test|asdf|[0-9a-f]{8,})$/i;
+
+/** Exported for evals — whether a found contact may enter sequences/send. */
+export function isBuyerReachableContact(contact: Pick<FoundContact, "email" | "verification_status">): boolean {
+  const local = (contact.email.split("@")[0] ?? "").toLowerCase();
+  if (ROLE_LOCAL.test(local) || NON_BUYER_LOCAL.test(local)) return false;
+  if (
+    contact.verification_status === "role_inbox" ||
+    contact.verification_status === "non_buyer_inbox" ||
+    contact.verification_status === "unverified"
+  ) {
+    return false;
+  }
+  return (
+    contact.verification_status === "verified_public" ||
+    contact.verification_status === "hermes_evidence" ||
+    contact.verification_status === "valid"
+  );
+}
 
 const EMAIL_RE = /\b([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})\b/g;
 
@@ -39,6 +64,7 @@ function isPlausibleEmail(email: string, companyDomain: string): boolean {
 
 function classify(email: string, method?: FoundContact["method"]): EmailVerificationStatus {
   const local = email.split("@")[0] ?? "";
+  if (NON_BUYER_LOCAL.test(local)) return "non_buyer_inbox";
   if (ROLE_LOCAL.test(local)) return "role_inbox";
   if (method === "hermes") return "hermes_evidence";
   return "verified_public";
@@ -51,7 +77,7 @@ async function fetchText(url: string, timeoutMs = 12_000): Promise<string | null
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "KamiSalesBot/1.0 (+https://trykami.app)",
+        "User-Agent": "KamiSalesBot/1.0 (+https://github.com/saranambiar/kami)",
         Accept: "text/html,text/plain",
       },
       redirect: "follow",
@@ -81,13 +107,16 @@ function extractEmails(text: string, companyDomain: string): string[] {
   return [...found];
 }
 
+function localRank(email: string): number {
+  const local = email.split("@")[0] ?? "";
+  if (NON_BUYER_LOCAL.test(local)) return 2;
+  if (ROLE_LOCAL.test(local)) return 1;
+  return 0;
+}
+
 function pickBestEmail(emails: string[]): string | null {
   if (!emails.length) return null;
-  const ranked = [...emails].sort((a, b) => {
-    const aRole = ROLE_LOCAL.test(a.split("@")[0] ?? "") ? 1 : 0;
-    const bRole = ROLE_LOCAL.test(b.split("@")[0] ?? "") ? 1 : 0;
-    return aRole - bRole;
-  });
+  const ranked = [...emails].sort((a, b) => localRank(a) - localRank(b));
   return ranked[0];
 }
 
@@ -106,13 +135,20 @@ export async function findPublicContact(domain: string): Promise<FoundContact | 
     const emails = extractEmails(html, host);
     const email = pickBestEmail(emails);
     if (!email) continue;
+    const verification_status = classify(email, "site_scrape");
     return {
       email,
-      verification_status: classify(email, "site_scrape"),
+      verification_status,
       source_url: url,
       name: undefined,
-      title: ROLE_LOCAL.test(email.split("@")[0] ?? "") ? "Role inbox" : undefined,
+      title:
+        verification_status === "role_inbox"
+          ? "Role inbox"
+          : verification_status === "non_buyer_inbox"
+            ? "Non-buyer mailbox"
+            : undefined,
       method: "site_scrape",
+      buyer_reachable: isBuyerReachableContact({ email, verification_status }),
     };
   }
 
@@ -172,13 +208,15 @@ Output ONLY a fenced json block:
       ? parsed.source_url
       : `https://${host}`;
 
+  const verification_status = classify(email, "hermes");
   return {
     email,
     name: typeof parsed.name === "string" ? parsed.name : undefined,
     title: typeof parsed.title === "string" ? parsed.title : undefined,
-    verification_status: classify(email, "hermes"),
+    verification_status,
     source_url,
     method: "hermes",
+    buyer_reachable: isBuyerReachableContact({ email, verification_status }),
   };
 }
 
@@ -224,12 +262,19 @@ export async function findContactForDomain(
 
     const linkupEmail = pickBestEmail([...emails]);
     if (linkupEmail) {
+      const verification_status = classify(linkupEmail, "linkup");
       return {
         email: linkupEmail,
-        verification_status: classify(linkupEmail, "linkup"),
+        verification_status,
         source_url: sourceHit,
         method: "linkup",
-        title: ROLE_LOCAL.test(linkupEmail.split("@")[0] ?? "") ? "Role inbox" : undefined,
+        title:
+          verification_status === "role_inbox"
+            ? "Role inbox"
+            : verification_status === "non_buyer_inbox"
+              ? "Non-buyer mailbox"
+              : undefined,
+        buyer_reachable: isBuyerReachableContact({ email: linkupEmail, verification_status }),
       };
     }
 

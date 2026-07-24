@@ -13,4 +13,4 @@
 - Discovery: X user-token search (`xLeadDiscover.ts`) + Apify IG (`apifyIgDiscover.ts`); Hermes ranks only
 - Cold DMs: `POST /api/marketing/dm` uses session user X/IG tokens; Marketing CRM approve triggers send
 - Boost: queued until `X_ADS_*`
-- `origin/prod` is **behind** `dev` and does **not** include marketing vertical code — do not use prod for marketing work
+- Public default is `main` (renamed from `prod`); PR into `dev`, promote to `main`. Do not revive hosted trykami.app as the product surface.

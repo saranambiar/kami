@@ -16,7 +16,7 @@ import {
 } from "../../lib/salesResearch";
 import { synthesizePlanFromConfig } from "../../lib/salesPlan";
 import { cleanPositioningLine, salesWhoLabel, dossierToNlPrefill } from "../../lib/salesDossierPrefill";
-import { normalizeDomainInput } from "../../lib/domainIdentity";
+import { isSameBrandHost, normalizeDomainInput } from "../../lib/domainIdentity";
 import { validateDossier } from "../../lib/dossierValidation";
 import {
   segmentsFromDossier,
@@ -428,6 +428,10 @@ function runDomainTruthGates(passed: string[], failed: string[]): void {
     errors.push("normalizeDomainInput should reject localhost");
   } else if (normalizeDomainInput("https://arguslabs.in/about") !== "arguslabs.in") {
     errors.push("normalizeDomainInput should strip path to host");
+  } else if (!isSameBrandHost("notion.so", "notion.com")) {
+    errors.push("isSameBrandHost should allow notion.so → notion.com");
+  } else if (isSameBrandHost("notion.so", "figma.com")) {
+    errors.push("isSameBrandHost must reject unrelated redirects");
   } else {
     passed.push("domain/normalize_and_reject");
   }

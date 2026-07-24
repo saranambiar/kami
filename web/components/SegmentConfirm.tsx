@@ -265,8 +265,10 @@ export default function SegmentConfirm({ sessionDbId, onConfirmed }: SegmentConf
     busyMode === "refresh"
       ? "Asking Hermes for segments"
       : busyMode === "confirm"
-        ? "Saving ICP"
-        : "Loading segments";
+        ? "Saving ICP confirmation"
+        : busyMode === "load"
+          ? "Loading saved ICP"
+          : "Working…";
 
   const busyStages =
     busyMode === "refresh"
@@ -276,12 +278,21 @@ export default function SegmentConfirm({ sessionDbId, onConfirmed }: SegmentConf
           "Checking PLG vs B2B motions…",
         ]
       : busyMode === "load"
-        ? ["Loading campaign…", "Deriving segments if needed…"]
+        ? ["Loading campaign…", "Using saved draft ICP if available…"]
         : ["Validating…", "Persisting confirmed ICP…"];
+
+  const busyDetail =
+    busyMode === "load"
+      ? "Loading saved ICP — Hermes only runs if no draft exists yet."
+      : busyMode === "refresh"
+        ? "Deriving ICP segments with Hermes…"
+        : busyMode === "confirm"
+          ? "Saving your confirmed ICP…"
+          : null;
 
   return (
     <div className="sales-panel" style={{ position: "relative", paddingTop: "var(--stack-md)" }}>
-      {busy && <SalesBusyOverlay title={busyTitle} stages={busyStages} />}
+      {busy && <SalesBusyOverlay title={busyTitle} stages={busyStages} detail={busyDetail} />}
 
       <h3 style={{ marginBottom: "var(--stack-sm)" }}>Confirm who you&apos;re selling to</h3>
       <p className="sales-intro">

@@ -1,33 +1,30 @@
-# Kami — Local Community Edition setup
+# Kami — minimal local setup
 
-Kami is a **self-hosted, BYOK** GTM agency. Two moving parts:
+Self-hosted **Community Edition**. Two moving parts:
 
-- **`web/`** — Next.js UI + API routes
-- **Hermes gateway** — local agent backend (`/v1/chat/completions` on `:8642`)
+1. **Hermes gateway** — agent backend on `127.0.0.1:8642`
+2. **`web/`** — Next.js UI + API
 
-You bring: a model key, a free Supabase project, and (optionally) research/email/X keys.
-Kami does not require `api.trykami.app` or any hosted Kami account.
-
-Canonical product loops: [docs/product-loops.md](docs/product-loops.md).  
-Community guide: [docs/community-edition.md](docs/community-edition.md).  
-Optional hosted deploy (maintainers only): [deploy/README.md](deploy/README.md).
+You bring: a **model key**, a **Supabase** project, and Node 20+.  
+Optional: research / email / X keys (Kami degrades cleanly without them).
 
 ---
 
 ## 1. Prerequisites
 
-- **Node.js 20+** and npm
-- **Git**
-- Your own **Supabase** project
-- A model key for Hermes (OpenAI / OpenRouter / etc.)
-- On Windows use **PowerShell** (not WSL) for `npm run dev`
+- Node.js **20+** and npm
+- Git
+- [Hermes Agent](https://hermes-agent.nousresearch.com/docs/) installed
+- Your own Supabase project
+- A model API key for Hermes (OpenAI / OpenRouter / etc.)
+- Windows: use **PowerShell** (not WSL) for `npm run dev`
 
 ---
 
 ## 2. Clone + install
 
 ```powershell
-git clone <your-fork-or-repo-url>
+git clone https://github.com/saranambiar/kami.git
 cd kami
 cd web
 npm install
@@ -35,16 +32,16 @@ npm install
 
 ---
 
-## 3. Environment variables
+## 3. Environment
 
-### Hermes home (gateway)
+### Hermes home
 
-Copy [`.env.example`](.env.example) into Hermes home:
+Copy [`.env.example`](.env.example) into Hermes home and fill at least your model key + `API_SERVER_KEY`:
 
 - Windows: `%LOCALAPPDATA%\hermes\.env`
 - macOS/Linux: `~/.hermes/.env`
 
-Fill at least `OPENAI_API_KEY` (or your provider) and `API_SERVER_KEY`.
+Enable the API server (`API_SERVER_ENABLED=true`, port **8642**).
 
 ### Web app
 
@@ -53,29 +50,29 @@ cd web
 copy .env.example .env.local
 ```
 
-Required in `web/.env.local`:
+**Required** in `web/.env.local`:
 
 ```dotenv
 HERMES_GATEWAY_URL=http://127.0.0.1:8642/v1/chat/completions
 HERMES_API_KEY=<same as API_SERVER_KEY>
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<your service role key>
+SUPABASE_SERVICE_ROLE_KEY=<service role key>
 ```
 
-Optional (unlocks more):
+**Optional** (unlock more; all degrade if missing):
 
 | Variable | Unlocks |
 |----------|---------|
 | `LINKUP_API_KEY` / `EXA_API_KEY` / `TAVILY_API_KEY` | Faster research |
-| `HERMES_BROWSER_CDP_URL` | Browser research (dedicated Chrome profile) |
+| `HERMES_BROWSER_CDP_URL` | Browser research |
 | `AGENTMAIL_API_KEY` + `AGENTMAIL_INBOX` | Real Sales sends |
-| `X_CLIENT_ID` / `X_CLIENT_SECRET` | X OAuth + publish path |
+| `X_CLIENT_ID` / `X_CLIENT_SECRET` | X OAuth + Post to X |
 
 ---
 
 ## 4. Database migrations
 
-Apply in order in the Supabase SQL editor (or CLI):
+In the Supabase SQL editor (or CLI), apply **in order**:
 
 1. `web/supabase/migrations/001_init.sql`
 2. `002_crm.sql`
@@ -84,67 +81,49 @@ Apply in order in the Supabase SQL editor (or CLI):
 5. `005_connected_accounts_session.sql`
 6. `007_sales_segments.sql`
 7. `008_domain_truth.sql`
-8. `009_distribution_opportunities.sql` — **required for Marketing** (`distribution_campaigns` + `distribution_opportunities`). Without it, Early users / Recommend campaign fails with a schema-cache error.
-9. `010_agent_run_logs.sql` — **required for observability** (every Hermes/pipeline output → Supabase). View in `/ledger` or `GET /api/observability/runs`.
+8. `009_distribution_opportunities.sql` — **required for Marketing**
+9. `010_agent_run_logs.sql` — **required for observability**
 
-If Marketing setup returns “Distribution tables missing…”, re-run migration `009` in the Supabase SQL editor, then retry.
-If Ledger shows “Apply migration 010…”, run `010_agent_run_logs.sql`.
+(Skip `006` if it is not in the tree.)
 
 ---
 
-## 5. Hermes gateway + skills
-
-1. Install Hermes: https://hermes-agent.nousresearch.com/docs/
-2. Enable API server (`API_SERVER_ENABLED=true`, port `8642`) and start the gateway
-3. Sync skills:
+## 5. Start Hermes → sync → web
 
 ```powershell
-# from repo root
+# Terminal A — Hermes gateway (API server on :8642)
+hermes gateway run
+
+# Terminal B — from repo root
+cd kami
 npm run sync:skills
-# or: powershell -File scripts/sync-hermes-skills.ps1
-```
-
-4. Readiness check (no secrets printed):
-
-```powershell
 npm run readiness
-```
 
-### Browser research (default free mode)
-
-1. Launch Chrome with a **dedicated** profile and remote debugging, e.g. port `9222`
-2. In Hermes: `/browser connect` (or set `browser.cdp_url` / `HERMES_BROWSER_CDP_URL`)
-3. Do **not** attach your everyday browser profile without consent
-
----
-
-## 6. Run the web app
-
-```powershell
 cd web
 npm run dev
 ```
 
-Open http://localhost:3000 → enter domain → confirm dossier → Find customers or Create distribution.
+Open **http://localhost:3000**.
 
 ---
 
-## 7. Product flows
+## 6. You’re done when
 
-**Sales:** Confirm who/what → ICP → Plan → Find → Emails → Needs you. Never invent emails.
+`GET http://localhost:3000/api/capabilities` shows roughly:
 
-**Marketing:** Goal → opportunity queue → approve/copy/manual-post → record outcome. CRM/cold DMs live under Advanced (later feature).
+- `"hermes": true`
+- `"database": true`
+- `"modelConfigured": true`
 
-**Kami Guide:** Ask anything; company + campaign context is injected every turn.
+Then: enter a domain → confirm dossier → **Find customers** or **Create distribution**.
 
 ---
 
-## 8. Evals / checks
+## More detail
 
-```powershell
-cd web
-npm run eval:sales
-npm run build
-```
-
-Release checklist: [docs/community-release-checklist.md](docs/community-release-checklist.md).
+- BYOK + agent setup prompts: [docs/community-edition.md](docs/community-edition.md)
+- Product loops: [docs/product-loops.md](docs/product-loops.md)
+- Browser CDP / research modes: [docs/community-edition.md](docs/community-edition.md)
+- Hosted deploy (maintainers): [deploy/README.md](deploy/README.md)
+- Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Release checklist: [docs/community-release-checklist.md](docs/community-release-checklist.md)
