@@ -23,10 +23,10 @@ Follow the minimal path in **[SETUP.md](SETUP.md)** (Hermes + Supabase + migrati
 
 BYOK detail and **copy-paste agent setup prompts**: [docs/community-edition.md](docs/community-edition.md).
 
-```powershell
+```bash
 cd web
 npm install
-copy .env.example .env.local
+cp .env.example .env.local   # Windows: copy .env.example .env.local
 cd ..
 npm run sync:skills
 npm run readiness
@@ -129,7 +129,7 @@ Board, Ledger, and CRM pages may exist in the repo for maintainers but are **not
 
 ## Checks before PR
 
-```powershell
+```bash
 npm run eval:sales
 npm run build
 ```
