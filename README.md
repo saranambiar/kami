@@ -108,6 +108,7 @@ Rules: Community Edition is local only — do not require trykami.app. Never inv
 | Doc | Purpose |
 |-----|---------|
 | [SETUP.md](SETUP.md) | Full local setup |
+| [docs/architecture.md](docs/architecture.md) | Hermes agent orchestration & decisions |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | PRs, branches (`dev` base), roadmap |
 | [docs/product-loops.md](docs/product-loops.md) | Product / UX contract |
 | [docs/community-edition.md](docs/community-edition.md) | BYOK detail + agent prompts |

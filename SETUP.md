@@ -196,6 +196,7 @@ Then:
 
 ## More
 
+- Hermes agents (plan → delegate → review → gate): [docs/architecture.md](docs/architecture.md)
 - BYOK + agent prompts: [docs/community-edition.md](docs/community-edition.md)
 - Product loops: [docs/product-loops.md](docs/product-loops.md)
 - X / Instagram credentials: [docs/marketing-credentials.md](docs/marketing-credentials.md)
