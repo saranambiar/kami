@@ -1,6 +1,6 @@
 # Kami E2E evaluation harness
 
-API-scripted founder path for the [10-company gold corpus](../../../docs/gold-standard-test-corpus.md). No Playwright. No email send. No publish.
+API-scripted founder path over fixtures in `fixtures/companies.json`. No Playwright. No email send. No publish.
 
 ## Prerequisites
 

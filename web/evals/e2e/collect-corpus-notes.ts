@@ -390,7 +390,7 @@ async function main(): Promise<void> {
   lines.push("## 6. Cross-cutting observations (for later RCA / gold compare)");
   lines.push("");
   lines.push(
-    "Use this section as the bridge into `docs/gold-standard-test-corpus.md` — hard gates already passed; these are qualitative notes from the pulled outputs.",
+    "Hard gates already passed; these are qualitative notes from the pulled outputs.",
   );
   lines.push("");
 
@@ -453,7 +453,7 @@ async function main(): Promise<void> {
   lines.push("");
   lines.push("Machine-readable dump: `web/evals/e2e/results/corpus-8-snapshot.json`.");
   lines.push("");
-  lines.push("Related: [gold-standard-test-corpus.md](../../../docs/gold-standard-test-corpus.md) · [GAPLOG.md](./GAPLOG.md) · [evaluation-and-iteration-plan.md](../../../docs/evaluation-and-iteration-plan.md).");
+  lines.push("Related: [GAPLOG.md](./GAPLOG.md) · fixtures in `fixtures/companies.json`.");
   lines.push("");
 
   const outMd = join(__dirname, "CORPUS-8-OUTPUT-NOTES.md");

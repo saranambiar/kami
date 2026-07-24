@@ -121,7 +121,7 @@ Kami recommends one first customer segment in plain English, helps the founder c
 
 ## References
 
-- [Sales vertical docs](sales/README.md)
-- [Evaluation & iteration plan (multi-company API E2E)](evaluation-and-iteration-plan.md)
 - [DESIGN.md](../DESIGN.md)
 - [AGENTS.md](../AGENTS.md) — Product UX principles
+- [SETUP.md](../SETUP.md) — local Community Edition setup
+- Eval harness: `web/evals/e2e/` (run `npm run eval:e2e`)

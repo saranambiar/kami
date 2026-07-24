@@ -17,6 +17,10 @@ web/.env.local
 # Hermes / local agent clutter
 .claude/settings.local.json
 references/
+.cursor/
+tasks/
+lessons/
+memory/
 
 # E2E / eval artifacts (GAPLOG.md stays committed)
 web/evals/e2e/results/

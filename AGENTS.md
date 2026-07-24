@@ -1,6 +1,6 @@
 # AGENTS.md — GTM-as-a-Service Agent Org (Hermes Buildathon)
 
-This is the guiding document for the coding agent building this project. Read fully before starting. Referenced folders (`tasks/`, `lessons/`, `memory/`) are operating infrastructure for you, the coding agent — set them up first if they don't exist.
+This is the guiding document for the coding agent building this project. Read fully before starting. Public setup lives in `README.md` / `SETUP.md`. Optional local-only notes (`tasks/`, `lessons/`, `memory/`) may exist on your machine but are not part of the published Community Edition tree.
 
 ---
 
@@ -92,30 +92,16 @@ If something is behind schedule, cut breadth (fewer playbooks/specialists) befor
 
 ### Plan mode is default
 - Enter plan mode for any non-trivial task (3+ steps or an architectural decision). Trivial one-line fixes don't need it.
-- Write the plan to `tasks/todo.md` as checkable items before starting implementation.
 - Check in with the user before starting implementation on anything non-trivial.
 - Mark items complete as you go; give a high-level summary of what changed at each step.
 - Use plan mode for verification steps too, not just building.
 - If something goes sideways mid-implementation, stop and re-plan immediately — don't keep pushing on a broken approach.
-- When a task is fully done, write a short review/results section into `tasks/todo.md`, then clear/archive completed items so the file stays current and short.
 
 ### Subagent strategy (for you, the coding agent, separate from the Hermes subagents we're building)
 - Use subagents liberally to keep your own main context window clean.
 - Offload research, exploration, and parallel analysis to subagents.
 - One clear, focused task per subagent.
 - For hard problems, throw more compute at it via subagents rather than one long single-threaded attempt.
-
-### Lessons — self-improvement loop
-- Maintain `lessons/lessons.md`.
-- After any correction from the user, or any time you hit a mistake or notice an important pattern while coding, append it to `lessons/lessons.md` as a short, reusable rule for your future self.
-- Review `lessons/lessons.md` at the start of every session before starting work.
-- Ruthlessly iterate — the goal is a dropping mistake rate over the session, not a growing unreviewed log.
-
-### Memory — persistent project knowledge
-- Maintain a `memory/` folder of multiple linked `.md` files (not one giant file). Create `memory/index.md` as the entry point that links out to the others by topic.
-- Whenever you start a task, log a concise bullet-point summary of what you're doing, for your own later reference — not a narrative, just enough to reorient fast.
-- Whenever a new feature or relevant decision is added, log it in the appropriate memory file, cross-linked from `index.md`.
-- Purpose: you should never need to re-scan the whole codebase/conversation history to reorient — memory + lessons + index should get you there fast.
 
 ### Verification before marking anything done
 - Never mark a task complete without proving it works — run it, check logs, show real output.
