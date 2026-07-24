@@ -1,5 +1,7 @@
 # Contributing to Kami
 
+Keep PRs small and easy to review. Skim [README.md](README.md) and [AGENTS.md](AGENTS.md) if you touch agents, skills, or product behavior.
+
 ## Product contract
 
 Read [docs/product-loops.md](docs/product-loops.md) first. UX must stay simple: domain → confirm dossier → **Find customers** or **Create distribution** → small approved batches.
@@ -133,6 +135,12 @@ npm run build
 ```
 
 When touching Marketing or Sales flows, also run a focused `npm run eval:e2e -- --fixture …`.
+
+- [ ] Branched from `dev` (PR base = `dev`)
+- [ ] Change is scoped (one concern)
+- [ ] Real-surface behavior still real
+- [ ] PR description: **what**, **why**, **how to verify**
+- [ ] No secrets committed
 
 ## What we will reject
 
