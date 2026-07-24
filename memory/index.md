@@ -18,5 +18,4 @@ Working notes for coding agents (`memory/`, `tasks/`, `lessons/`) — not end-us
 - [Evaluation & iteration plan (multi-company E2E)](../docs/evaluation-and-iteration-plan.md)
 - [Gold-standard 10-company test corpus](../docs/gold-standard-test-corpus.md)
 - [E2E eval harness (API runner + GAPLOG)](./e2e-eval-harness.md)
-- [Corpus-8 output notes (compare vs gold)](../docs/evals/corpus-8-output-notes.md)
 - Research digest / source notes: `references/research-context.md`

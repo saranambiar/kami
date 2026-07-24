@@ -1,8 +1,7 @@
 /**
  * Typed handoff contracts — every hop between agents passes one of these
- * objects (referenced by ID in state, never prose). Source: PLAN.md
- * §"Typed handoff contracts" + real-agency workflow extensions
- * (sequence_step / followup_at / reply handling).
+ * objects (referenced by ID in state, never prose).
+ * Includes sequence_step / followup_at / reply handling.
  */
 
 export type Goal = "book_meetings" | "drive_signups" | "press" | "awareness";

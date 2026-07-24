@@ -458,15 +458,6 @@ async function main(): Promise<void> {
 
   const outMd = join(__dirname, "CORPUS-8-OUTPUT-NOTES.md");
   writeFileSync(outMd, lines.join("\n"), "utf8");
-  // Also copy under docs for discoverability
-  const docsOut = join(__dirname, "../../../docs/evals/corpus-8-output-notes.md");
-  try {
-    mkdirSync(dirname(docsOut), { recursive: true });
-    writeFileSync(docsOut, lines.join("\n"), "utf8");
-    console.log("wrote", docsOut);
-  } catch (e) {
-    console.warn("docs copy skipped", e);
-  }
   console.log("wrote", outMd);
 }
 

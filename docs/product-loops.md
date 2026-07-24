@@ -1,6 +1,6 @@
 # Kami product loops
 
-Source of truth for Kami's founder-facing MVP. See [plans/sales-founder-ux.md](plans/sales-founder-ux.md) for Sales implementation detail.
+Source of truth for Kami's founder-facing MVP.
 
 ## What Kami sells
 
@@ -122,7 +122,6 @@ Kami recommends one first customer segment in plain English, helps the founder c
 ## References
 
 - [Sales vertical docs](sales/README.md)
-- [Founder UX RCA & remediation](sales/founder-ux-rca.md) — known gaps between this intent and live Plan/Find behavior
 - [Evaluation & iteration plan (multi-company API E2E)](evaluation-and-iteration-plan.md)
 - [DESIGN.md](../DESIGN.md)
 - [AGENTS.md](../AGENTS.md) — Product UX principles

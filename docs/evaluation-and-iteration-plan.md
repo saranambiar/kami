@@ -366,8 +366,6 @@ Shared hard gates always apply (identity lock, no invented emails, observability
 
 Commands: `npm run eval:e2e` · offline units remain `npm run eval:sales`.
 
-First 8-fixture output comparison (dossiers, accounts, opportunities, RCA notes): [evals/corpus-8-output-notes.md](./evals/corpus-8-output-notes.md).
-
 ---
 
 ## 11. How to use this doc

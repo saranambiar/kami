@@ -28,7 +28,6 @@ Kami is not a bulk outreach tool. Hermes coordinates research, planning, draftin
 - [Autonomy, compliance, and execution policy](./compliance-and-autonomy.md)
 - [Provider and integration matrix](./provider-integration-matrix.md)
 - [UI and information architecture](./ui-information-architecture.md)
-- [Founder UX RCA & remediation log](./founder-ux-rca.md) — current state, root causes (RC-1–RC-10), prioritized next steps after live cal.com testing
 - [Measurement, evaluations, and rollout](./measurement-and-evals.md)
 - [Verification checklist (post-implementation)](./verification-checklist.md)
 
