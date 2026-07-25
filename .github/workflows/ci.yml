@@ -34,5 +34,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: readiness script loads
-        run: node scripts/readiness.mjs || true
+      - name: readiness fails without required keys
+        run: |
+          set +e
+          node scripts/readiness.mjs
+          status=$?
+          set -e
+          test "$status" -eq 1
+      - name: readiness passes with fixture env
+        env:
+          HERMES_API_KEY: ci-placeholder
+          HERMES_GATEWAY_URL: http://127.0.0.1:8642/v1/chat/completions
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
+        run: node scripts/readiness.mjs
