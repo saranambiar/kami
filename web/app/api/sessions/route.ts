@@ -25,10 +25,13 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: "hermesSessionId and domain required" }, { status: 400 });
   }
 
+  const goalsValue = Array.isArray(goals) ? goals : [];
   const row: Record<string, unknown> = {
     hermes_session_id: hermesSessionId,
     domain,
-    goals: goals ?? [],
+    goals: goalsValue,
+    // Sales plan/segments/sequences read goals_list (008); keep both in sync.
+    goals_list: goalsValue,
     stage: stage ?? null,
   };
   if (canonical_domain) row.canonical_domain = canonical_domain;
