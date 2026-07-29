@@ -113,8 +113,15 @@ Rules: Community Edition is local only — do not require trykami.app. Never inv
 | [docs/product-loops.md](docs/product-loops.md) | Product / UX contract |
 | [docs/community-edition.md](docs/community-edition.md) | BYOK detail + agent prompts |
 | [SECURITY.md](SECURITY.md) | Secrets & privacy |
-| [LICENSE](LICENSE) | MIT |
+| [LICENSE](LICENSE) | MIT (+ Remotion exception) |
+| [docs/trademark-clearance-notes.md](docs/trademark-clearance-notes.md) | Informal “Kami” name collision notes |
+| [web/evals/e2e/fixtures/NOTICE.md](web/evals/e2e/fixtures/NOTICE.md) | Eval domains are not partners |
+| [NOTICE](NOTICE) | Copyright + pointer to third-party notices |
+| [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) | Remotion, LGPL, MPL, CC-BY, OFL |
+| [assets/README.md](assets/README.md) | Logo provenance / brand rights |
+| [video/README.md](video/README.md) | Optional Remotion demo tooling |
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT for Kami-authored source — see [LICENSE](LICENSE).  
+Remotion under `video/` is **not** MIT — see [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
