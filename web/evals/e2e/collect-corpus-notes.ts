@@ -78,7 +78,9 @@ async function main(): Promise<void> {
         get(`/api/marketing/distribution/opportunities?session_id=${encodeURIComponent(sid)}`),
         get(`/api/sales/setup?session_id=${encodeURIComponent(sid)}`),
         get(`/api/sales/plan?session_id=${encodeURIComponent(sid)}`),
-        get(`/api/sales/segments?session_id=${encodeURIComponent(sid)}`).catch(() => ({})),
+        get(`/api/sales/segments?session_id=${encodeURIComponent(sid)}`).catch(
+          () => ({}) as AnyRec,
+        ),
       ]);
 
     const brand = (sessionPack.brand ?? null) as AnyRec | null;
@@ -155,7 +157,7 @@ async function main(): Promise<void> {
               segments_confirmed_at: (salesSetup.config as AnyRec).segments_confirmed_at,
             }
           : null,
-        segments: (segments.segments as unknown[]) ?? null,
+        segments: ((segments as AnyRec).segments as unknown[]) ?? null,
         plan: plan.plan
           ? {
               id: (plan.plan as AnyRec).id,

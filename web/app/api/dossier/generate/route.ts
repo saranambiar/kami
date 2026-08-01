@@ -5,6 +5,7 @@ import type { Dossier } from "@/lib/hermes";
 import { hermesChatOnce, hermesGatewayConfigured, parseLastJsonBlock } from "@/lib/hermesServer";
 import type { ResearchSnapshot } from "@/lib/linkup";
 import { onboardingPrompt } from "@/lib/prompts";
+import { sessionGoalsFromRow } from "@/lib/sessionGoals";
 import { supabaseServer } from "@/lib/supabase";
 
 export const maxDuration = 300;
@@ -132,7 +133,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const { data: session, error } = await sb
     .from("agent_sessions")
-    .select("domain, canonical_domain, hermes_session_id, research_snapshot, domain_check, goals_list")
+    .select("domain, canonical_domain, hermes_session_id, research_snapshot, domain_check, goals_list, goals")
     .eq("id", session_id)
     .maybeSingle();
 
@@ -161,12 +162,7 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const sessionGoals =
-    goals.length > 0
-      ? goals
-      : Array.isArray(session.goals_list)
-        ? (session.goals_list as unknown[]).filter((g): g is string => typeof g === "string")
-        : [];
+  const sessionGoals = goals.length > 0 ? goals : sessionGoalsFromRow(session);
 
   const prompt = onboardingPrompt({
     domain: identity.canonical_domain,

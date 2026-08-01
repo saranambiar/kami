@@ -1,6 +1,7 @@
 import { supabaseServer } from "@/lib/supabase";
 import { dossierFromBrandPayload } from "@/lib/cmoContext";
 import { generateSalesStrategy } from "@/lib/salesStrategy";
+import { sessionGoalsFromRow } from "@/lib/sessionGoals";
 import type { SalesCampaignConfig, SalesPlan } from "@/lib/salesTypes";
 import type { SalesSegment } from "@/lib/salesSegments";
 
@@ -147,17 +148,14 @@ export async function POST(request: Request): Promise<Response> {
     const [session, brand] = await Promise.all([
       sb
         .from("agent_sessions")
-        .select("domain, canonical_domain, goals_list, hermes_session_id")
+        .select("domain, canonical_domain, goals_list, goals, hermes_session_id")
         .eq("id", session_id)
         .maybeSingle(),
       sb.from("brand_profiles").select("*").eq("session_id", session_id).maybeSingle(),
     ]);
 
     const domain = (session?.data?.canonical_domain || session?.data?.domain || "") as string;
-    const goalsRaw = session?.data?.goals_list;
-    const goals = Array.isArray(goalsRaw)
-      ? goalsRaw.filter((g): g is string => typeof g === "string")
-      : [];
+    const goals = sessionGoalsFromRow(session?.data);
     const dossier = dossierFromBrandPayload(brand.data);
 
     const strategist = await generateSalesStrategy({
