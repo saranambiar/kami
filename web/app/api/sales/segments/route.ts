@@ -8,6 +8,7 @@ import {
   type SalesSegment,
 } from "@/lib/salesSegments";
 import { dossierFromBrandPayload } from "@/lib/cmoContext";
+import { sessionGoalsFromRow } from "@/lib/sessionGoals";
 
 async function loadSessionContext(sessionId: string): Promise<{
   dossier: Dossier | null;
@@ -20,21 +21,16 @@ async function loadSessionContext(sessionId: string): Promise<{
   const [session, brand] = await Promise.all([
     sb
       .from("agent_sessions")
-      .select("domain, canonical_domain, goals_list")
+      .select("domain, canonical_domain, goals_list, goals")
       .eq("id", sessionId)
       .maybeSingle(),
     sb.from("brand_profiles").select("*").eq("session_id", sessionId).maybeSingle(),
   ]);
 
-  const goalsRaw = session.data?.goals_list;
-  const goals = Array.isArray(goalsRaw)
-    ? goalsRaw.filter((g): g is string => typeof g === "string")
-    : [];
-
   return {
     domain: (session.data?.canonical_domain || session.data?.domain || "") as string,
     dossier: dossierFromBrandPayload(brand.data),
-    goals,
+    goals: sessionGoalsFromRow(session.data),
   };
 }
 

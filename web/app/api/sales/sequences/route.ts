@@ -1,5 +1,6 @@
 import { supabaseServer } from "@/lib/supabase";
 import { buildEmailSequence, SEQUENCE_STEPS } from "@/lib/salesSequences";
+import { sessionGoalsFromRow } from "@/lib/sessionGoals";
 import type { AccountSignal, SalesAccount } from "@/lib/salesTypes";
 
 /** Buyer-reachable only — role/non-buyer/safe_to_send aliases are not sequence-eligible. */
@@ -90,12 +91,10 @@ export async function POST(request: Request): Promise<Response> {
 
   const { data: sessionRow } = await sb
     .from("agent_sessions")
-    .select("goals_list")
+    .select("goals_list, goals")
     .eq("id", session_id)
     .maybeSingle();
-  const goalsList = Array.isArray(sessionRow?.goals_list)
-    ? (sessionRow!.goals_list as string[])
-    : [];
+  const goalsList = sessionGoalsFromRow(sessionRow);
   const goal = goalsList[0] ?? "";
 
   const enrolled: string[] = [];
