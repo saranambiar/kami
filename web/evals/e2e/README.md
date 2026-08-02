@@ -2,6 +2,8 @@
 
 API-scripted founder path over fixtures in `fixtures/companies.json`. No Playwright. No email send. No publish.
 
+**No affiliation:** Names like cal.com / notion.so / nike.in in fixtures are **test cases only**. Kami has no partnership with those companies. See [`fixtures/NOTICE.md`](fixtures/NOTICE.md).
+
 ## Prerequisites
 
 1. Web app running (`npm run dev` from repo root) with Supabase + Hermes configured
