@@ -83,7 +83,9 @@ Role prompts live in [`agents/`](../agents/). Each file is a contract: what the 
 | **Sales qualifier** | Scores / buying groups | Draft or send |
 | **Sales conversation manager** | Reply triage / escalate | Direct send outside policy |
 | **Sales meeting coordinator** | Calendar after qualify | Invent meetings without provider receipt |
-| **Marketing strategist** | Angle + platform plan | Publish or DM |
+| **Distribution manager** | Infer goal/angle/surfaces from dossier; `delegate_task` to platform leaves; synthesize opportunities | Publish or invent URLs |
+| **Marketing strategist** | Helps shape angle + surfaces for the manager recommend step | Publish or DM |
+| **Distribution platform specialist** | Leaf per `*_distribution` skill | Delegate further or publish |
 | **Marketing researcher** | Advanced CRM discovery (later / Advanced) | Default founder Marketing path |
 | **Conversation / boost** | Advanced DM / ads specialists | Default Community Edition journey |
 
@@ -103,7 +105,7 @@ That copies repo `skills/<name>/` → Hermes home `skills/gtm/<name>/` (Windows:
 |---------|--------|-----------|
 | **Manager / policy** | `planning`, `business_rules`, `suppression_and_consent`, `review_rubric`, `sales_review_rubric` | Plan, gates, review checklists |
 | **Sales** | `sales_strategy`, `icp_segmentation`, `icp_account_tiering`, `signal_research`, `signal_cold_email`, `email_sequence`, `reply_triage`, `meeting_booking` | Find customers pipeline |
-| **Distribution** | `x_distribution`, `reddit_distribution`, `linkedin_distribution`, `hackernews_distribution`, `producthunt_distribution`, `discord_distribution` | Create distribution opportunities |
+| **Distribution** | `viral_formats`, `x_distribution`, `reddit_distribution`, `linkedin_distribution`, `hackernews_distribution`, `producthunt_distribution`, `discord_distribution` | Create distribution opportunities (live formats + platform playbooks) |
 | **Advanced** | `creator_outreach`, `x_cold_dm`, `persona_mimic` | Later / Advanced paths |
 
 **Contributor rule:** change GTM procedure in `SKILL.md`. Do not invent a parallel agent runtime inside the web app.
@@ -221,7 +223,7 @@ When improving “how the agency thinks,” prefer `agents/` + `skills/` + `cont
 
 | Path | Role |
 |------|------|
-| [`agents/`](../agents/) | Role prompts and boundaries |
+| [`agents/`](../agents/) | Role prompts and boundaries (`distribution-manager.md`, platform specialist, …) |
 | [`skills/`](../skills/) | Decision playbooks |
 | [`contracts/contracts.ts`](../contracts/contracts.ts) | Typed handoff shapes |
 | [`state/`](../state/) | Campaign state read/append |

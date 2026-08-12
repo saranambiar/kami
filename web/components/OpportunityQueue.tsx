@@ -199,6 +199,12 @@ export default function OpportunityQueue({
               <p style={{ marginTop: "0.35rem", color: "var(--ink-soft)" }}>
                 <strong>Action:</strong> {o.suggested_action}
               </p>
+              {(o.format_used || o.format_why) && (
+                <p className="mono" style={{ fontSize: 12, marginTop: "0.35rem", color: "var(--ink-soft)" }}>
+                  <strong>Format:</strong> {o.format_used || "—"}
+                  {o.format_why ? ` — ${o.format_why}` : ""}
+                </p>
+              )}
               {o.risks && (
                 <p className="mono" style={{ fontSize: 12, marginTop: "0.35rem", color: "var(--hanko)" }}>
                   Risk / rules: {o.risks}

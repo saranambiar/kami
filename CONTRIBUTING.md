@@ -19,7 +19,7 @@ Ask Kami style lives in [`web/lib/prompts.ts`](web/lib/prompts.ts) (`cmoPrompt`)
 
 ## Local setup
 
-Follow the minimal path in **[SETUP.md](SETUP.md)** (Hermes + Supabase + migrations `001`–`010`).
+Follow the minimal path in **[SETUP.md](SETUP.md)** (Hermes + Supabase + migrations `001`–`012`).
 
 BYOK detail and **copy-paste agent setup prompts**: [docs/community-edition.md](docs/community-edition.md).
 

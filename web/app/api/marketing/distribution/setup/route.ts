@@ -1,7 +1,14 @@
+import { dossierFromBrandPayload } from "@/lib/cmoContext";
+import { recommendDistributionPlan } from "@/lib/distributionManager";
+import type {
+  DistributionCampaignConfig,
+  DistributionPlatform,
+  DistributionPlanStatus,
+} from "@/lib/distributionTypes";
+import { normalizeSurfaces } from "@/lib/distributionTypes";
 import { supabaseServer } from "@/lib/supabase";
-import type { DistributionCampaignConfig, DistributionGoal, DistributionPlatform } from "@/lib/distributionTypes";
 
-const GOALS: DistributionGoal[] = ["launch", "early_users", "credibility", "waitlist"];
+export const maxDuration = 120;
 
 function mapDbError(message: string | undefined): string {
   const m = message ?? "database error";
@@ -9,7 +16,10 @@ function mapDbError(message: string | undefined): string {
     /distribution_campaigns|distribution_opportunities/i.test(m) &&
     /(schema cache|does not exist|Could not find the table)/i.test(m)
   ) {
-    return "Distribution tables missing. Apply Supabase migration 009_distribution_opportunities.sql, then retry.";
+    return "Distribution tables missing. Apply Supabase migrations 009 and 011, then retry.";
+  }
+  if (/column .* does not exist|goal_label|why_these_surfaces/i.test(m)) {
+    return "Distribution plan columns missing. Apply Supabase migration 011_distribution_plan.sql, then retry.";
   }
   return m;
 }
@@ -18,9 +28,16 @@ function rowToConfig(row: Record<string, unknown>): DistributionCampaignConfig {
   return {
     id: row.id as string,
     session_id: row.session_id as string,
-    goal: row.goal as DistributionGoal,
+    goal: (row.goal as string) ?? "early_users",
+    goal_label: (row.goal_label as string) ?? undefined,
     angle: (row.angle as string) ?? undefined,
-    surfaces: (row.surfaces as DistributionPlatform[]) ?? [],
+    surfaces: normalizeSurfaces(row.surfaces),
+    rationale: (row.rationale as string) ?? undefined,
+    why_these_surfaces: (row.why_these_surfaces as string) ?? undefined,
+    status: (row.status as DistributionPlanStatus) ?? "proposed",
+    revise_note: (row.revise_note as string) ?? undefined,
+    source: row.source === "hermes" || row.source === "fallback" ? row.source : undefined,
+    hermes_session_id: (row.hermes_session_id as string) ?? null,
     autonomous_paused: Boolean(row.autonomous_paused),
     created_at: row.created_at as string | undefined,
     updated_at: row.updated_at as string | undefined,
@@ -46,36 +63,102 @@ export async function POST(request: Request): Promise<Response> {
 
   const body = await request.json();
   const session_id = body.session_id as string | undefined;
-  const goal = body.goal as DistributionGoal | undefined;
-  if (!session_id || !goal || !GOALS.includes(goal)) {
-    return Response.json({ error: "session_id and valid goal required" }, { status: 400 });
+  if (!session_id) return Response.json({ error: "session_id required" }, { status: 400 });
+
+  const action = (body.action as string | undefined) || "recommend";
+
+  if (action === "approve") {
+    const { data: existing } = await sb
+      .from("distribution_campaigns")
+      .select("*")
+      .eq("session_id", session_id)
+      .maybeSingle();
+    if (!existing) {
+      return Response.json({ error: "no distribution plan to approve" }, { status: 400 });
+    }
+
+    const patch: Record<string, unknown> = {
+      status: "approved",
+      updated_at: new Date().toISOString(),
+    };
+    if (typeof body.goal === "string" && body.goal.trim()) patch.goal = body.goal.trim();
+    if (typeof body.goal_label === "string") patch.goal_label = body.goal_label.trim();
+    if (typeof body.angle === "string" && body.angle.trim()) patch.angle = body.angle.trim();
+    if (Array.isArray(body.surfaces)) patch.surfaces = normalizeSurfaces(body.surfaces).slice(0, 3);
+    if (typeof body.rationale === "string") patch.rationale = body.rationale.trim();
+    if (typeof body.why_these_surfaces === "string") {
+      patch.why_these_surfaces = body.why_these_surfaces.trim();
+    }
+
+    const { data, error } = await sb
+      .from("distribution_campaigns")
+      .update(patch)
+      .eq("session_id", session_id)
+      .select("*")
+      .single();
+    if (error) return Response.json({ error: mapDbError(error.message) }, { status: 500 });
+    return Response.json({ config: rowToConfig(data) });
   }
 
-  const angle =
-    typeof body.angle === "string" && body.angle.trim()
-      ? body.angle.trim()
-      : defaultAngle(goal);
-  const surfaces: DistributionPlatform[] = Array.isArray(body.surfaces)
-    ? body.surfaces
-    : ["x", "reddit", "linkedin"];
+  // recommend (default) or revise
+  const revise_note =
+    typeof body.revise_note === "string" && body.revise_note.trim()
+      ? body.revise_note.trim()
+      : undefined;
+
+  const [session, brand] = await Promise.all([
+    sb
+      .from("agent_sessions")
+      .select("domain, canonical_domain, hermes_session_id")
+      .eq("id", session_id)
+      .maybeSingle(),
+    sb.from("brand_profiles").select("*").eq("session_id", session_id).maybeSingle(),
+  ]);
+
+  const domain = (session?.data?.canonical_domain ||
+    session?.data?.domain ||
+    "unknown") as string;
+  const dossier = dossierFromBrandPayload(brand.data);
+  const hermesSid =
+    typeof session?.data?.hermes_session_id === "string"
+      ? session.data.hermes_session_id
+      : undefined;
+
+  const result = await recommendDistributionPlan({
+    sessionId: session_id,
+    domain,
+    dossier,
+    reviseNote: revise_note,
+    hermesSessionId: hermesSid,
+  });
+
+  const row = {
+    session_id,
+    goal: result.plan.goal,
+    goal_label: result.plan.goal_label ?? null,
+    angle: result.plan.angle ?? null,
+    surfaces: result.plan.surfaces ?? [],
+    rationale: result.plan.rationale ?? null,
+    why_these_surfaces: result.plan.why_these_surfaces ?? null,
+    status: "proposed" as const,
+    revise_note: revise_note ?? null,
+    source: result.source,
+    hermes_session_id: result.plan.hermes_session_id ?? null,
+    updated_at: new Date().toISOString(),
+  };
 
   const { data, error } = await sb
     .from("distribution_campaigns")
-    .upsert(
-      {
-        session_id,
-        goal,
-        angle,
-        surfaces,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "session_id" },
-    )
+    .upsert(row, { onConflict: "session_id" })
     .select("*")
     .single();
 
   if (error) return Response.json({ error: mapDbError(error.message) }, { status: 500 });
-  return Response.json({ config: rowToConfig(data) });
+  return Response.json({
+    config: rowToConfig(data),
+    source: result.source,
+    note: result.note ?? null,
+  });
 }
 
 export async function PATCH(request: Request): Promise<Response> {
@@ -87,8 +170,19 @@ export async function PATCH(request: Request): Promise<Response> {
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (typeof body.autonomous_paused === "boolean") patch.autonomous_paused = body.autonomous_paused;
-  if (typeof body.angle === "string") patch.angle = body.angle;
-  if (Array.isArray(body.surfaces)) patch.surfaces = body.surfaces;
+  if (typeof body.goal === "string") patch.goal = body.goal.trim();
+  if (typeof body.goal_label === "string") patch.goal_label = body.goal_label.trim();
+  if (typeof body.angle === "string") patch.angle = body.angle.trim();
+  if (Array.isArray(body.surfaces)) {
+    patch.surfaces = normalizeSurfaces(body.surfaces as DistributionPlatform[]).slice(0, 3);
+  }
+  if (typeof body.rationale === "string") patch.rationale = body.rationale.trim();
+  if (typeof body.why_these_surfaces === "string") {
+    patch.why_these_surfaces = body.why_these_surfaces.trim();
+  }
+  if (body.status === "proposed" || body.status === "approved" || body.status === "superseded") {
+    patch.status = body.status;
+  }
 
   const { data, error } = await sb
     .from("distribution_campaigns")
@@ -98,17 +192,4 @@ export async function PATCH(request: Request): Promise<Response> {
     .single();
   if (error) return Response.json({ error: mapDbError(error.message) }, { status: 500 });
   return Response.json({ config: rowToConfig(data) });
-}
-
-function defaultAngle(goal: DistributionGoal): string {
-  switch (goal) {
-    case "launch":
-      return "Show a concrete before/after moment of the product and invite early feedback.";
-    case "early_users":
-      return "Join conversations where people describe the exact problem you solve; offer a useful answer first.";
-    case "credibility":
-      return "Share a specific insight from building the product that peers would bookmark.";
-    case "waitlist":
-      return "Create curiosity with a clear problem statement and a low-friction waitlist ask.";
-  }
 }
