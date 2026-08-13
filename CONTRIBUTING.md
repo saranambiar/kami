@@ -2,6 +2,22 @@
 
 Keep PRs small and easy to review. Skim [README.md](README.md) and [AGENTS.md](AGENTS.md) if you touch agents, skills, or product behavior.
 
+## CLA (required)
+
+Every human contributor must sign the [Contributor License Agreement](CLA.md) on their pull request by commenting:
+
+```text
+I have read the CLA Document and I hereby sign the CLA
+```
+
+You keep copyright. The grant lets Kami keep Community Edition MIT and, if maintainers later ship Enterprise, relicense the same contributions. Sign once per GitHub user; the bot stores it on the `cla-signatures` branch. Bots are allowlisted. Maintainers (`@saranambiar`, `@VaradDurge`) sign once too.
+
+Comment `recheck` if the CLA check is stale.
+
+## Reviews
+
+PRs need **one approving review from the other maintainer** (GitHub will not let you approve your own PR). [CODEOWNERS](.github/CODEOWNERS) lists both. Open PRs against **`dev`**.
+
 ## Product contract
 
 Read [docs/product-loops.md](docs/product-loops.md) first. UX must stay simple: domain → confirm dossier → **Find customers** or **Create distribution** → small approved batches.
@@ -140,6 +156,7 @@ When touching Marketing or Sales flows, also run a focused `npm run eval:e2e -- 
 - [ ] Change is scoped (one concern)
 - [ ] Real-surface behavior still real
 - [ ] PR description: **what**, **why**, **how to verify**
+- [ ] CLA signed on the PR (see above)
 - [ ] No secrets committed
 
 ## What we will reject
