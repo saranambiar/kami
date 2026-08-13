@@ -53,6 +53,12 @@ Windows (PowerShell): `cd kami\web` then `npm install`.
    - `API_SERVER_KEY=` a long random secret (same value will go in `web/.env.local` as `HERMES_API_KEY`)
 4. Confirm `config.yaml` (or env) does not leave you on a provider with an empty key.
 5. For nested manager → specialist delegation, Hermes `delegation.max_spawn_depth` should be **≥ 2** if you use orchestrator roles (see Hermes docs / project `AGENTS.md`).
+6. **Marketing distribution research** uses a Hermes Distribution Manager that calls `delegate_task` with a parallel `tasks` array (platform specialists). Ensure:
+   - `delegation.orchestrator_enabled` is not `false`
+   - Research/browser tools are enabled on the gateway so **leaf** specialists inherit them
+   - Skills are synced (`npm run sync:skills`) so `{platform}_distribution` playbooks exist under Hermes `skills/gtm/`
+   - Top-level manager → leaf only needs default spawn depth; raise `max_spawn_depth` if the manager itself is nested
+   - The OpenAI-compatible API server runs `delegate_task` **synchronously** on `/v1/chat/completions` (stateless), so research requests may take several minutes — keep the gateway process up
 
 Start the gateway when ready (exact command depends on your Hermes install; common pattern):
 
@@ -113,6 +119,8 @@ In the Supabase **SQL editor** (or CLI), apply **in this order**:
 | 8 | `008_domain_truth.sql` | Domain / dossier |
 | 9 | `009_distribution_opportunities.sql` | **Required for Marketing queue** |
 | 10 | `010_agent_run_logs.sql` | **Required for observability / Ledger-style logs** |
+| 11 | `011_distribution_plan.sql` | **Required for Hermes-recommended distribution plans** (flexible goal + approve status) |
+| 12 | `012_opportunity_formats.sql` | **Required for viral format fields** (`format_used` / `format_why`) on opportunities |
 
 If a step errors on “already exists”, you may be re-applying — check which migrations already ran.
 

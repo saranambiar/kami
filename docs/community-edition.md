@@ -27,7 +27,7 @@ Read first: README.md, SETUP.md, docs/community-edition.md, web/.env.example, ro
 
 Do:
 1) Install Hermes if missing. Enable API server on 127.0.0.1:8642. Windows Hermes home = %LOCALAPPDATA%\hermes (not ~/.hermes). Ask me for the model key and API_SERVER_KEY; never print or commit secrets.
-2) Create or connect my Supabase project. Apply migrations in web/supabase/migrations/ in order: 001–010. Confirm before running SQL.
+2) Create or connect my Supabase project. Apply migrations in web/supabase/migrations/ in order: 001–012. Confirm before running SQL.
 3) Write web/.env.local from web/.env.example (not root .env.example) with HERMES_GATEWAY_URL=http://127.0.0.1:8642/v1/chat/completions, HERMES_API_KEY matching API_SERVER_KEY, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Leave AgentMail, X, Linkup/Exa/Tavily, CDP unset unless I provide them.
 4) npm install in web/. From repo root: npm run sync:skills && npm run readiness.
 5) Start Hermes gateway, then npm run dev in web/ (prefer next dev --webpack if Turbopack fails on Windows/WSL).
@@ -46,7 +46,7 @@ Read SETUP.md, docs/community-edition.md, web/.env.example, root .env.example. N
 
 Target state:
 - Hermes API server on 127.0.0.1:8642 with my model key (Windows home: %LOCALAPPDATA%\hermes)
-- Supabase migrations 001–010 applied
+- Supabase migrations 001–012 applied
 - web/.env.local from web/.env.example: Hermes gateway URL + matching API key + Supabase URL + service role only
 - AgentMail, X, research providers, CDP only if I explicitly provide credentials
 

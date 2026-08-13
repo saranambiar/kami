@@ -11,7 +11,7 @@
       "sales": { "discover_companies": false, "sales_default_invalid": true },
       "marketing": { "goal": "early_users", "expect_opportunities": true },
       "must_not": ["invent_consumer_emails", "force_find_companies_as_only_path", "enterprise_outbound_default"],
-      "required_log_kinds": ["dossier_research", "dossier_persist", "distribution_research", "distribution_opportunities"]
+      "required_log_kinds": ["dossier_research", "dossier_persist", "distribution_plan", "distribution_research", "distribution_opportunities"]
     },
     "notes": "Early-access browser personalization — Marketing/PLG only."
   },
@@ -59,7 +59,7 @@
       "sales": { "discover_companies": false, "sales_default_invalid": true },
       "marketing": { "goal": "early_users", "expect_opportunities": true },
       "must_not": ["invent_consumer_emails", "force_find_companies_as_only_path", "shopper_email_blast"],
-      "required_log_kinds": ["dossier_research", "dossier_persist", "distribution_research", "distribution_opportunities"]
+      "required_log_kinds": ["dossier_research", "dossier_persist", "distribution_plan", "distribution_research", "distribution_opportunities"]
     },
     "notes": "D2C — never invent shopper emails."
   },
@@ -121,7 +121,7 @@
       "sales": { "discover_companies": false, "sales_default_invalid": true },
       "marketing": { "goal": "early_users", "expect_opportunities": true },
       "must_not": ["invent_consumer_emails", "sell_paid_schools", "learner_email_blast"],
-      "required_log_kinds": ["dossier_research", "dossier_persist", "distribution_research", "distribution_opportunities"]
+      "required_log_kinds": ["dossier_research", "dossier_persist", "distribution_plan", "distribution_research", "distribution_opportunities"]
     }
   },
   {
@@ -151,7 +151,7 @@
       "sales": { "discover_companies": false, "sales_default_invalid": true },
       "marketing": { "goal": "early_users", "expect_opportunities": true },
       "must_not": ["invent_consumer_emails", "conflate_arc_dia", "enterprise_arc_licenses"],
-      "required_log_kinds": ["dossier_research", "dossier_persist", "distribution_research", "distribution_opportunities"]
+      "required_log_kinds": ["dossier_research", "dossier_persist", "distribution_plan", "distribution_research", "distribution_opportunities"]
     },
     "notes": "Arc vs Dia disambiguation is a hard identity gate."
   }
