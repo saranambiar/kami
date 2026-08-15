@@ -93,7 +93,8 @@ export async function POST(request: Request): Promise<Response> {
 
   const body = await request.json();
   const session_id = body.session_id as string | undefined;
-  const action = (body.action as string) || "research";
+  const id = body.id as string | undefined;
+  const action = (body.action as string | undefined) ?? (id ? "update" : "research");
 
   if (!session_id) return Response.json({ error: "session_id required" }, { status: 400 });
 
@@ -191,7 +192,6 @@ export async function POST(request: Request): Promise<Response> {
     });
   }
 
-  const id = body.id as string | undefined;
   if (!id) return Response.json({ error: "id required" }, { status: 400 });
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
